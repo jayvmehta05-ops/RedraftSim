@@ -1,0 +1,45 @@
+{
+  "league_name": "2027 Redraft Sim",
+  "target_season": 2027,
+  "source_season": 2026,
+  "teams": 12,
+  "draft_rounds": 15,
+  "roster": {
+    "QB": 1,
+    "RB": 2,
+    "WR": 2,
+    "TE": 1,
+    "FLEX": 1,
+    "BENCH": 6
+  },
+  "flex_eligible": ["RB", "WR", "TE"],
+  "scoring": {
+    "pass_yd": 0.04,
+    "pass_td": 4,
+    "pass_int": -2,
+    "pass_2pt": 2,
+    "rush_yd": 0.1,
+    "rush_td": 6,
+    "rush_2pt": 2,
+    "rec": 1.0,
+    "rec_yd": 0.1,
+    "rec_td": 6,
+    "rec_2pt": 2,
+    "fum_lost": -2,
+    "te_premium": 0.0
+  },
+  "toggles": {
+    "flex_count": { "options": [1, 2], "path": "roster.FLEX" },
+    "ppr": { "options": [1.0, 0.5], "path": "scoring.rec" },
+    "pass_td": { "options": [4, 6], "path": "scoring.pass_td" },
+    "te_premium": { "options": [0.0, 0.5], "path": "scoring.te_premium" }
+  },
+  "projection": {
+    "board_size": 250,
+    "export_pool_size": 400,
+    "prior_season_weight": 0.4,
+    "td_regression": 0.5,
+    "market_adp_weight": 0.2,
+    "base_games": 15.5
+  }
+}
