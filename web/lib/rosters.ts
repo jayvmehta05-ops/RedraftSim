@@ -25,7 +25,7 @@ export function unmatchedCount(r: Roster, byId: Map<string, RankedPlayer>, byEsp
 
 /** Carry hand edits (added / removed players) over when a league is re-imported. */
 export function keepRosterEdits(prev: ImportedLeague | null, next: ImportedLeague): ImportedLeague {
-  if (prev?.rules) next = { ...next, rules: prev.rules }; // hand-set league rules survive a re-import
+  if (prev?.rules) next = { ...next, rules: { ...next.rules, ...prev.rules } }; // hand-set league rules survive a re-import
   if (!prev?.rosters || !next.rosters) return next;
   const edits = new Map(prev.rosters.map((r) => [r.managerId, r]));
   return {
@@ -42,4 +42,12 @@ export function boardMaps(board: RankedPlayer[]) {
     byId: new Map(board.map((p) => [p.id, p])),
     byEspn: new Map(board.filter((p) => p.espnId).map((p) => [String(p.espnId), p])),
   };
+}
+
+/** Keeper features are opt-in: on when you turned them on for this league, or the platform says it's a
+ *  keeper / dynasty league. Without a league, the site-wide setting decides. */
+export function keeperOn(league: ImportedLeague | null, siteSetting: boolean): boolean {
+  if (!league) return siteSetting;
+  if (league.rules?.keeper != null) return league.rules.keeper;
+  return league.kind === "keeper" || league.kind === "dynasty";
 }

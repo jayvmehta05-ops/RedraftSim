@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } from "@/lib/refresh";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
+import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import LuckMeter from "./LuckMeter";
 import MyTeam from "./MyTeam";
@@ -48,7 +49,7 @@ function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember
 /** "My League": trades, waivers and power rankings for an imported (or hand-made) league. */
 export default function LeagueHub(props: {
   board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague | null; myManager: string | null;
-  leaguemates: LeaguemateProfile[]; weeksLeft: number; onOpenSettings: () => void;
+  leaguemates: LeaguemateProfile[]; weeksLeft: number; keeper: boolean; onOpenSettings: () => void;
   onLeagueRefreshed: (l: ImportedLeague) => void; onChooseManager: (id: string | null) => void; onOpenEditor: () => void;
 }) {
   const [section, setSection] = useState<Section>("team");
@@ -95,6 +96,8 @@ export default function LeagueHub(props: {
   ];
   const current = sections.find((s) => s.id === section)!;
   const blocked = section !== "trades" && (!ready || (current.needsMe && !league?.managers.some((m) => m.id === myManager)));
+  // Redraft rosters reset after the season, so in-season tools pause until next season (keeper leagues look ahead)
+  const offseason = props.weeksLeft <= 0 && !props.keeper && section !== "luck";
 
   return (
     <div className="space-y-4">
@@ -115,21 +118,28 @@ export default function LeagueHub(props: {
           <button onClick={() => setAutoNote(null)} className="ml-auto text-slate-500 hover:text-white" aria-label="Dismiss">✕</button>
         </div>
       )}
-      {(section === "trades" || blocked) && (
+      {offseason && (
+        <div className="rounded-xl bg-slate-900/60 p-6 text-sm text-slate-400 ring-1 ring-slate-800">
+          The {SOURCE} season is over. In a redraft league everyone starts fresh, so rosters, trades, waivers and power rankings
+          return when the next season kicks off. Meanwhile the {TARGET} Big Board and mock drafts are ready, and the Luck meter
+          still has this season&apos;s story. In a keeper league? Switch League type to Keeper in settings.
+        </div>
+      )}
+      {!offseason && (section === "trades" || blocked) && (
         <TradeAssistant {...props} onRefresh={() => refresh()} refreshing={refreshing} refreshError={needsLogin ? null : refreshError} />
       )}
-      {section === "team" && !blocked && league && myManager && (
+      {!offseason && section === "team" && !blocked && league && myManager && (
         <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} leaguemates={props.leaguemates}
-          weeksLeft={props.weeksLeft} onGo={setSection} onOpenEditor={props.onOpenEditor} />
+          weeksLeft={props.weeksLeft} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} />
       )}
-      {section === "waivers" && !blocked && league && myManager && (
-        <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} />
+      {!offseason && section === "waivers" && !blocked && league && myManager && (
+        <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} keeper={props.keeper} />
       )}
       {section === "luck" && !blocked && league && (
         <LuckMeter league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />
       )}
-      {section === "power" && !blocked && league && (
-        <PowerRankings board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} />
+      {!offseason && section === "power" && !blocked && league && (
+        <PowerRankings board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} keeper={props.keeper} />
       )}
     </div>
   );

@@ -6,7 +6,7 @@ import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
 import { buildLeaguemateBots } from "@/lib/leaguemates";
 import { type ProfileOverride, effectiveProfile } from "@/lib/profiles";
-import { keepRosterEdits } from "@/lib/rosters";
+import { keepRosterEdits, keeperOn } from "@/lib/rosters";
 import AccountButton from "./AccountButton";
 import BigBoard from "./BigBoard";
 import LeagueEditor from "./LeagueEditor";
@@ -31,6 +31,7 @@ const TABS = [
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 const STORAGE_KEY = "redraft27.toggles";
+const KEEPER_KEY = "redraft27.keeperMode"; // site-wide keeper mode when no league is imported
 const LEAGUE_KEY = "redraft27.league";
 const ME_KEY = "redraft27.myManager";
 const PROFILES_KEY = "redraft27.profiles";
@@ -85,6 +86,9 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   const [toggles, setToggles] = useState<Toggles>(defaults);
   const [tab, setTab] = useState<Tab>("board");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [siteKeeper, setSiteKeeper] = useState(false);
+  const keeper = keeperOn(league, siteKeeper);
+  const tabs = TABS.filter((t) => t.id !== "keepers" || keeper);
 
   // Restore an imported league (best effort)
   useEffect(() => {
@@ -102,6 +106,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       setSavedLeagues(all);
       setMyManagers(mys);
       setAllOverrides(JSON.parse(localStorage.getItem(PROFILES_KEY) ?? "{}"));
+      setSiteKeeper(localStorage.getItem(KEEPER_KEY) === "1");
     } catch {
       /* storage unavailable */
     }
@@ -165,6 +170,12 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
     setLeague(lg);
     save(LEAGUE_KEY, lg);
     storeSaved({ ...savedLeagues, [leagueKey(lg)]: lg });
+  };
+  // Keeper mode: saved on the active league, or site-wide when there's no league
+  const setKeeper = (on: boolean) => {
+    if (league) editLeague({ ...league, rules: { ...league.rules, keeper: on } });
+    else { setSiteKeeper(on); save(KEEPER_KEY, on ? "1" : null); }
+    if (!on && tab === "keepers") setTab("board");
   };
   const chooseManager = (id: string | null, forLeague: ImportedLeague | null = league) => {
     setMyManager(id);
@@ -234,7 +245,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
             </p>
           </div>
           <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Sections">
-            {TABS.map((t) => (
+            {tabs.map((t) => (
               <button key={t.id} onClick={() => go(t.id)} aria-current={tab === t.id ? "page" : undefined}
                 className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
                 {t.label}
@@ -267,10 +278,10 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
         {tab === "trades" && (
           <LeagueHub board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
-            weeksLeft={Math.max(0, 17 - m.throughWeek)} onOpenSettings={() => setSettingsOpen(true)}
+            weeksLeft={Math.max(0, 17 - m.throughWeek)} keeper={keeper} onOpenSettings={() => setSettingsOpen(true)}
             onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} onOpenEditor={() => setEditorOpen(true)} />
         )}
-        {tab === "keepers" && <KeeperCalc board={board} cfg={cfg} />}
+        {tab === "keepers" && keeper && <KeeperCalc board={board} cfg={cfg} />}
         {tab === "trends" && <TrendTracker board={board} trends={trends} throughWeek={m.throughWeek} />}
       </main>
 
@@ -294,7 +305,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       {/* Phone / tablet: app-style bottom tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-800 bg-slate-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Sections">
         <div className="mx-auto grid max-w-lg grid-cols-6">
-          {TABS.map(({ id, short, icon: Icon }) => (
+          {tabs.map(({ id, short, icon: Icon }) => (
             <button key={id} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined}
               className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${tab === id ? "text-emerald-400" : "text-slate-500"}`}>
               <Icon className="h-5 w-5" />
@@ -309,7 +320,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         onChange={updateToggles} cfg={cfg} replacement={replacement}
         league={league} onImport={importLeague} myManager={myManager} onChooseManager={(id) => chooseManager(id)}
         savedLeagues={Object.entries(savedLeagues).map(([key, l]) => ({ key, name: l.name, provider: l.provider }))}
-        activeKey={league ? leagueKey(league) : null} onSwitchLeague={switchLeague}
+        activeKey={league ? leagueKey(league) : null} onSwitchLeague={switchLeague} keeper={keeper} onKeeper={setKeeper}
         onOpenEditor={() => { setSettingsOpen(false); setEditorOpen(true); }} />
       <LeagueEditor open={editorOpen} onClose={() => setEditorOpen(false)} board={board} cfg={cfg} league={league}
         learned={learned} overrides={overrides} onOverrides={setOverrides} onLeagueChange={editLeague} myManager={myManager} />

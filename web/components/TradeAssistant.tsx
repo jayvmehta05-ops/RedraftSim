@@ -4,11 +4,12 @@ import { useMemo, useState } from "react";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import type { ImportedLeague, LeagueConfig, Pos, RankedPlayer } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
-import { SOURCE, TARGET } from "@/lib/season";
+import { SOURCE } from "@/lib/season";
 import {
   type Horizon, type Partner, type TradeEval, type Valued, evaluateTrade, findTrades, playerValue, positionStrength,
 } from "@/lib/trade";
 import { IconSwap } from "./icons";
+import { HorizonToggle, horizonLabel } from "./Waivers";
 import { resolveRoster, unmatchedCount } from "@/lib/rosters";
 import { PosBadge, fmt } from "./ui";
 
@@ -19,6 +20,8 @@ interface Props {
   myManager: string | null;
   leaguemates: LeaguemateProfile[];
   weeksLeft: number;
+  /** keeper league: allow valuing next season too */
+  keeper: boolean;
   onOpenSettings: () => void;
   onLeagueRefreshed: (l: ImportedLeague) => void;
   onChooseManager: (id: string | null) => void;
@@ -92,8 +95,9 @@ function Empty({ title, body, action, error }: { title: string; body: string; ac
   );
 }
 
-export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, onOpenSettings, onChooseManager, onOpenEditor, onRefresh, refreshing, refreshError }: Props) {
-  const [horizon, setHorizon] = useState<Horizon>(weeksLeft > 2 ? "ros" : "next");
+export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, keeper, onOpenSettings, onChooseManager, onOpenEditor, onRefresh, refreshing, refreshError }: Props) {
+  const [picked, setHorizon] = useState<Horizon>("ros");
+  const horizon: Horizon = keeper ? (weeksLeft > 0 ? picked : "both") : "ros"; // offseason keeper leagues look ahead
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [give, setGive] = useState<Set<string>>(new Set());
   const [get, setGet] = useState<Set<string>>(new Set());
@@ -180,12 +184,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
           <div className="text-sm font-semibold text-white">Trade assistant · {me.name}</div>
           <div className="text-[11px] text-slate-500">{league.name} · rosters {fetched ? `as of ${fetched}` : "loaded"}{me.unmatched ? ` · ${me.unmatched} of your players (K/DST or deep bench) aren't valued` : ""}</div>
         </div>
-        <div className="flex rounded-lg bg-slate-950 p-1 ring-1 ring-slate-800">
-          {([["ros", `Rest of ${SOURCE}`], ["next", `${TARGET} season`], ["both", "Both (keeper)"]] as const).map(([h, label]) => (
-            <button key={h} onClick={() => setHorizon(h)} disabled={h !== "next" && weeksLeft <= 0}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${horizon === h ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>{label}</button>
-          ))}
-        </div>
+        <HorizonToggle horizon={horizon} setHorizon={setHorizon} keeper={keeper} />
         <button onClick={onOpenEditor} className="ml-auto rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700">
           Edit leaguemates &amp; rosters
         </button>
@@ -257,7 +256,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
               {custom.myGain > 0 && custom.theirGain > 0 ? "Win-win: both starting lineups improve." :
                 custom.myGain > 0 ? "Good for you, worse for them: expect pushback or a counter." :
                 custom.theirGain > 0 ? "This helps them more than you." : "This makes both lineups worse."}
-              {" "}Values are {horizon === "ros" ? `rest-of-${SOURCE} points (${weeksLeft} weeks left)` : horizon === "next" ? `${TARGET} season points` : `rest of ${SOURCE} + ${TARGET} points`} for each team&apos;s best starting lineup, plus a little bench depth.
+              {" "}Values are {horizon === "ros" ? `rest-of-${SOURCE} points (${weeksLeft} weeks left)` : `${horizonLabel(horizon)} points`} for each team&apos;s best starting lineup, plus a little bench depth.
             </p>
           </div>
         )}

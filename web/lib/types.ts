@@ -200,5 +200,9 @@ export interface ImportedLeague {
   rules?: {
     /** the league allows 1-week (loan) trades: players swap for one week, then go back */
     weekTrades?: boolean;
+    /** keeper features on/off for this league (overrides what the platform reported in `kind`) */
+    keeper?: boolean;
   };
+  /** league format as the platform reports it */
+  kind?: "redraft" | "keeper" | "dynasty";
 }

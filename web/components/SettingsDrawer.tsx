@@ -21,6 +21,8 @@ interface Props {
   savedLeagues: { key: string; name: string; provider: string }[];
   activeKey: string | null;
   onSwitchLeague: (key: string) => void;
+  keeper: boolean;
+  onKeeper: (on: boolean) => void;
 }
 
 const ESPN_AUTH_KEY = "redraft27.espnAuth";
@@ -72,7 +74,7 @@ function BackupRestore() {
         </label>
       </div>
       <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
-        {msg ?? "Your leagues, leaguemate notes, keepers and settings live only in this browser until accounts arrive. Back them up to a file to move devices."}
+        {msg ?? "Your leagues, leaguemate notes and settings live in this browser. Sign in to sync them across devices, or back them up to a file."}
       </p>
     </div>
   );
@@ -291,7 +293,7 @@ function Seg({ label, hint, value, options: preset, onPick }: {
   );
 }
 
-export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement, league, onImport, myManager, onChooseManager, onOpenEditor, savedLeagues, activeKey, onSwitchLeague }: Props) {
+export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement, league, onImport, myManager, onChooseManager, onOpenEditor, savedLeagues, activeKey, onSwitchLeague, keeper, onKeeper }: Props) {
   const set = (patch: Partial<Toggles>) => onChange({ ...toggles, ...patch });
   const r = cfg.roster;
   return (
@@ -314,6 +316,8 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
         <div className="flex-1 divide-y divide-slate-800 overflow-y-auto px-5">
           <LeagueImport league={league} onImport={onImport} myManager={myManager} onChooseManager={onChooseManager} onOpenEditor={onOpenEditor}
             savedLeagues={savedLeagues} activeKey={activeKey} onSwitchLeague={onSwitchLeague} />
+          <Seg label="League type" hint="keeper adds next-season value" value={keeper ? 1 : 0}
+            options={[{ v: 0, label: "Redraft" }, { v: 1, label: "Keeper" }]} onPick={(v) => onKeeper(v === 1)} />
           <Seg label="FLEX spots" hint="RB / WR / TE" value={toggles.flexCount}
             options={[{ v: 1, label: "1 FLEX" }, { v: 2, label: "2 FLEX" }]} onPick={(v) => set({ flexCount: v })} />
           <Seg label="Superflex" hint="flex spot a QB can fill" value={toggles.superflex}

@@ -2,23 +2,23 @@
 
 import { useMemo, useState } from "react";
 import { powerRankings } from "@/lib/league";
-import { SOURCE, TARGET } from "@/lib/season";
 import { encodePower } from "@/lib/share";
 import type { Horizon } from "@/lib/trade";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
 import { useLeagueTeams } from "./useLeagueTeams";
-import { HorizonToggle } from "./Waivers";
+import { HorizonToggle, horizonLabel as labelFor } from "./Waivers";
 import { PosBadge, fmt } from "./ui";
 
-export default function PowerRankings({ board, cfg, league, myManager, weeksLeft }: {
-  board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string | null; weeksLeft: number;
+export default function PowerRankings({ board, cfg, league, myManager, weeksLeft, keeper }: {
+  board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string | null; weeksLeft: number; keeper: boolean;
 }) {
-  const [horizon, setHorizon] = useState<Horizon>(weeksLeft > 2 ? "ros" : "next");
+  const [picked, setHorizon] = useState<Horizon>("ros");
+  const horizon: Horizon = keeper ? (weeksLeft > 0 ? picked : "both") : "ros"; // offseason keeper leagues look ahead
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const { teams } = useLeagueTeams(board, league, horizon, weeksLeft);
   const rows = useMemo(() => powerRankings(teams, cfg), [teams, cfg]);
-  const horizonLabel = horizon === "ros" ? `Rest of ${SOURCE}` : horizon === "next" ? `${TARGET} season` : `${SOURCE} + ${TARGET}`;
+  const horizonLabel = labelFor(horizon);
 
   const share = async () => {
     const code = encodePower({
@@ -41,7 +41,7 @@ export default function PowerRankings({ board, cfg, league, myManager, weeksLeft
           <div className="text-sm font-semibold text-white">Power rankings · {league.name}</div>
           <div className="text-[11px] text-slate-500">Every team ranked by its best projected starting lineup ({horizonLabel}), next to its actual record</div>
         </div>
-        <HorizonToggle horizon={horizon} setHorizon={setHorizon} weeksLeft={weeksLeft} />
+        <HorizonToggle horizon={horizon} setHorizon={setHorizon} keeper={keeper} />
         <button onClick={share} className="ml-auto rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400">{shareMsg ?? "Share rankings"}</button>
       </div>
 

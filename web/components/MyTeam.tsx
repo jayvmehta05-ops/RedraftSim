@@ -9,14 +9,19 @@ import type { ImportedLeague, LeagueConfig, Pos, RankedPlayer } from "@/lib/type
 import { POSITIONS } from "@/lib/types";
 import { TradeCard } from "./TradeAssistant";
 import { type LeagueTeam, useLeagueTeams } from "./useLeagueTeams";
-import { HorizonToggle } from "./Waivers";
+import { HorizonToggle, horizonLabel as labelFor } from "./Waivers";
 import { Flags, PosBadge, fmt, thumb } from "./ui";
 
 const POS_NAME: Record<Pos, string> = { QB: "quarterback", RB: "running back", WR: "receiver", TE: "tight end" };
 type Mode = "trade" | "week" | "shop";
 type TradeEval = BaseTrade & { partnerName?: string };
 
-function PlayerRow({ slot, x, dim, selected, onClick }: { slot?: string; x: Valued | null; dim?: boolean; selected?: boolean; onClick?: () => void }) {
+/** Rest-of-season points per game: ESPN's projection when available, else this season's average. */
+const rosPpg = (p: RankedPlayer) => p.cur.espnRosPpg ?? (p.g26 > 0 ? p.cur.ppg26 : null);
+
+function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper }: {
+  slot?: string; x: Valued | null; dim?: boolean; selected?: boolean; onClick?: () => void; rosRank?: number; keeper?: boolean;
+}) {
   if (!x) {
     return (
       <div className="flex items-center gap-3 border-b border-slate-800/70 bg-slate-950 px-4 py-2.5 last:border-0">
@@ -27,7 +32,7 @@ function PlayerRow({ slot, x, dim, selected, onClick }: { slot?: string; x: Valu
   }
   const p = x.p;
   const img = thumb(p.headshot, 64);
-  const ros = p.cur.espnRosPpg ?? (p.g26 > 0 ? p.cur.ppg26 : null);
+  const ros = rosPpg(p);
   const hurt = p.injury && p.injury !== "Active";
   return (
     <button type="button" onClick={onClick} aria-expanded={selected}
@@ -49,19 +54,25 @@ function PlayerRow({ slot, x, dim, selected, onClick }: { slot?: string; x: Valu
           <div className="text-[11px] text-slate-500">{p.team || "FA"}{p.age ? ` · ${p.age.toFixed(0)} yo` : ""}</div>
         </div>
       </div>
-      <PosBadge pos={p.pos} rank={p.cur.posRank} />
+      <span title={`Rank at ${p.pos} for the rest of ${SOURCE}`}><PosBadge pos={p.pos} rank={rosRank} /></span>
       <div className="w-16 text-right" title={`Projected points per game for the rest of ${SOURCE}`}>
         <div className="text-sm tabular-nums text-slate-200">{fmt(ros)}</div>
         <div className="text-[10px] text-slate-500">ROS PPG</div>
       </div>
-      <div className="w-16 text-right" title={`Projected points per game in ${TARGET}`}>
-        <div className="text-sm tabular-nums text-slate-200">{fmt(p.cur.ppg)}</div>
-        <div className="text-[10px] text-slate-500">{TARGET} PPG</div>
+      <div className="w-16 text-right" title={`Points per game so far in ${SOURCE}`}>
+        <div className="text-sm tabular-nums text-slate-200">{p.g26 > 0 ? fmt(p.cur.ppg26) : "—"}</div>
+        <div className="text-[10px] text-slate-500">{SOURCE} PPG</div>
       </div>
-      <div className="hidden w-16 text-right sm:block" title={`Overall rank on the ${TARGET} board`}>
-        <div className="text-sm tabular-nums text-slate-200">#{p.cur.rank}</div>
-        <div className="text-[10px] text-slate-500">{TARGET} rank</div>
+      <div className="hidden w-14 text-right sm:block" title={`Games played in ${SOURCE}`}>
+        <div className="text-sm tabular-nums text-slate-200">{p.g26}</div>
+        <div className="text-[10px] text-slate-500">games</div>
       </div>
+      {keeper && (
+        <div className="hidden w-16 text-right sm:block" title={`Projected points per game in ${TARGET} (keeper value)`}>
+          <div className="text-sm tabular-nums text-slate-200">{fmt(p.cur.ppg)}</div>
+          <div className="text-[10px] text-slate-500">{TARGET} PPG</div>
+        </div>
+      )}
     </button>
   );
 }
@@ -118,16 +129,25 @@ function PlayerActions({ player, owner, isMine, weekTrades, weeksLeft, onOpenEdi
 }
 
 /** Rosters: any team's best lineup and bench. Click a player to trade for them, or to shop your own. */
-export default function MyTeam({ board, cfg, league, myManager, leaguemates, weeksLeft, onGo, onOpenEditor }: {
+export default function MyTeam({ board, cfg, league, myManager, leaguemates, weeksLeft, keeper, onGo, onOpenEditor }: {
   board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string; leaguemates: LeaguemateProfile[];
-  weeksLeft: number; onGo: (section: "trades" | "waivers" | "power") => void; onOpenEditor: () => void;
+  weeksLeft: number; keeper: boolean; onGo: (section: "trades" | "waivers" | "power") => void; onOpenEditor: () => void;
 }) {
-  const [horizon, setHorizon] = useState<Horizon>(weeksLeft > 2 ? "ros" : "next");
+  const [picked, setHorizon] = useState<Horizon>("ros");
+  const horizon: Horizon = keeper ? (weeksLeft > 0 ? picked : "both") : "ros"; // offseason keeper leagues look ahead
   const [teamId, setTeamId] = useState(myManager);
   const [selected, setSelected] = useState<string | null>(null);
   const { teams } = useLeagueTeams(board, league, horizon, weeksLeft);
   const { teams: weekTeams } = useLeagueTeams(board, league, "week", weeksLeft);
   const leans = useMemo(() => new Map(leaguemates.map((l) => [l.managerId, l])), [leaguemates]);
+  // Rest-of-season rank at each position across the whole board
+  const rosRanks = useMemo(() => {
+    const out = new Map<string, number>();
+    for (const pos of POSITIONS) {
+      board.filter((p) => p.pos === pos && !p.rookie).sort((a, b) => (rosPpg(b) ?? -1) - (rosPpg(a) ?? -1)).forEach((p, i) => out.set(p.id, i + 1));
+    }
+    return out;
+  }, [board]);
   const me = teams.find((t) => t.id === myManager);
   const viewing = teams.find((t) => t.id === teamId) ?? me;
   const isMine = viewing?.id === myManager;
@@ -158,7 +178,7 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
   if (!me || !viewing || !view) return null;
 
   const row = power.find((r) => r.id === viewing.id);
-  const horizonLabel = horizon === "ros" ? `rest of ${SOURCE}` : horizon === "next" ? `${TARGET} season` : `${SOURCE} + ${TARGET}`;
+  const horizonLabel = labelFor(horizon);
   const sorted = row ? POSITIONS.map((p) => [p, row.strengths[p]] as const).sort((a, b) => a[1] - b[1]) : [];
   const weakest = sorted[0];
 
@@ -176,14 +196,14 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
     if (emptySlots) notes.push({ text: `${emptySlots} starting spot${emptySlots === 1 ? " has" : "s have"} no eligible player.`, go: "waivers" });
     const stash = [...view.bench].sort((a, b) => b.p.cur.points - a.p.cur.points)[0];
     const worstSame = stash && view.slots.filter((s) => s.x && s.x.p.pos === stash.p.pos).map((s) => s.x!).sort((a, b) => a.p.cur.points - b.p.cur.points)[0];
-    if (stash && worstSame && stash.p.cur.points > worstSame.p.cur.points) {
-      notes.push({ text: `${stash.p.name} sits on your bench but projects better than ${worstSame.p.name} for ${TARGET}. Worth holding in keeper leagues.` });
+    if (keeper && stash && worstSame && stash.p.cur.points > worstSame.p.cur.points) {
+      notes.push({ text: `${stash.p.name} sits on your bench but projects better than ${worstSame.p.name} for ${TARGET}. Worth keeping in mind for your keepers.` });
     }
   }
 
   const rowFor = (x: Valued | null, slot: string, dim?: boolean, key?: string) => (
     <div key={key ?? x?.p.id ?? slot}>
-      <PlayerRow slot={slot} x={x} dim={dim} selected={!!x && selected === x.p.id}
+      <PlayerRow slot={slot} x={x} dim={dim} selected={!!x && selected === x.p.id} rosRank={x ? rosRanks.get(x.p.id) : undefined} keeper={keeper}
         onClick={x ? () => setSelected(selected === x.p.id ? null : x.p.id) : undefined} />
       {x && selected === x.p.id && (
         <PlayerActions key={`${viewing.id}-${x.p.id}`} player={x.p} owner={viewing} isMine={isMine}
@@ -206,7 +226,7 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
             {row ? <>#{row.rank} of {power.length} by projected lineup ({horizonLabel})</> : null}
           </div>
         </div>
-        <HorizonToggle horizon={horizon} setHorizon={setHorizon} weeksLeft={weeksLeft} />
+        <HorizonToggle horizon={horizon} setHorizon={setHorizon} keeper={keeper} />
         <div className="ml-auto text-right">
           <div className="text-lg font-black tabular-nums text-white">{fmt(view.total, 0)}</div>
           <div className="text-[10px] text-slate-500">projected lineup pts</div>

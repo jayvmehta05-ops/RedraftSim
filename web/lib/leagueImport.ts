@@ -193,6 +193,7 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
     provider: "sleeper", leagueId: lg.league_id, season: lg.season, name: lg.name,
     teams: lg.total_rosters, roster, scoring, draftRounds: slotsTotal,
     notes: Array.from(new Set(notes)), managers, drafts: fullDrafts,
+    kind: leagueType === 2 ? "dynasty" : leagueType === 1 ? "keeper" : "redraft",
   };
 }
 
@@ -202,7 +203,7 @@ interface EspnLeague {
     name: string; size: number;
     rosterSettings: { lineupSlotCounts: Record<string, number> };
     scoringSettings: { scoringItems: { statId: number; points: number; pointsOverrides?: Record<string, number> }[] };
-    draftSettings?: { type?: string };
+    draftSettings?: { type?: string; keeperCount?: number };
   };
   teams?: {
     id: number; name?: string; location?: string; nickname?: string; owners?: string[];
@@ -316,6 +317,7 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
     fetchedAt: new Date().toISOString(),
     provider: "espn", leagueId: id, season: String(season), name: s.name, teams: s.size,
     roster, scoring, draftRounds: starters + roster.BENCH, notes: Array.from(new Set(notes)), managers, drafts,
+    kind: (s.draftSettings?.keeperCount ?? 0) > 0 ? "keeper" : "redraft",
   };
 }
 

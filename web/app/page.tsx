@@ -12,7 +12,7 @@ const board = boardJson as unknown as BoardData;
 
 export const metadata: Metadata = {
   title: `${SITE_NAME}: ${TARGET} fantasy football projections, mock drafts & league tools`,
-  description: `Next season's fantasy football board today, re-ranked for your league's exact rules. Mock drafts against bots that draft like your leaguemates, plus trade, waiver and keeper tools for ${SOURCE}.`,
+  description: `Next season's fantasy football board today, re-ranked for your league's exact rules. Mock drafts against bots that draft like your leaguemates, plus trade, waiver and luck tools for ${SOURCE}.`,
 };
 
 const FEATURES = [
@@ -20,14 +20,14 @@ const FEATURES = [
   { icon: IconMock, title: "Mock drafts that feel real", body: "Bots learn how each of your leaguemates actually drafts. Describe them in plain words if they're new." },
   { icon: IconLive, title: "Live draft assistant", body: "Follow your real draft pick by pick, with the odds each player is still there at your next turn." },
   { icon: IconSwap, title: "My League", body: "Your best lineup, trades the other manager would actually accept, waiver pickups ranked for your roster, and power rankings." },
-  { icon: IconKeeper, title: "Keeper calculator", body: "Which keepers are worth their cost, measured against where each player will really go." },
+  { icon: IconKeeper, title: "Luck meter", body: "Your all-play record and how many wins schedule luck gave or took, for every team in your league." },
   { icon: IconTrend, title: "Trends", body: "Risers and fallers week to week, so you see value shifts before your league does." },
 ];
 
 const STEPS = [
   { n: "1", title: "Bring your league", body: "Import from Sleeper or ESPN (private leagues too) or set it up by hand. No account needed." },
   { n: "2", title: "Everything re-ranks", body: "Scoring, roster slots and team count flow into every projection, ranking and suggestion." },
-  { n: "3", title: "Plan your moves", body: "Mock your draft, find trades, set keepers and work the waiver wire with numbers built for your league." },
+  { n: "3", title: "Plan your moves", body: "Mock your draft, find trades and work the waiver wire with numbers built for your league." },
 ];
 
 export default function Landing() {
@@ -74,7 +74,7 @@ export default function Landing() {
               </h1>
               <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-400 sm:text-lg">
                 Next-season fantasy football projections tuned to your exact scoring and roster, mock drafts against bots that draft like
-                your leaguemates, and the trade, waiver and keeper tools to win {SOURCE} along the way.
+                your leaguemates, and the trade and waiver tools to win {SOURCE} along the way.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-3">
                 <ContinueButton newLabel={`See the ${TARGET} board`}

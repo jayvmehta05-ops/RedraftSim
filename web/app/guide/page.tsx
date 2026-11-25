@@ -84,7 +84,7 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
     what: "Finds trades that improve your starting lineup and that the other manager would plausibly accept, and grades any trade you're considering.",
     how: [
       "Import your league (Settings) and pick your team. The assistant loads every roster.",
-      "Choose the time frame: rest of this season for in-season trades, next season for the offseason, or both for keeper leagues.",
+      "Values are rest-of-season points, because redraft rosters reset every year. In a keeper league? Set League type to Keeper in settings to also count next season.",
       "Each suggestion shows how many points it adds to your best lineup, what it does to theirs, and a chance they say yes based on their lineup gain, how the names look by ADP, and what they've favored in past drafts.",
       "Use the analyzer to tick any players on either side and see the result instantly.",
     ],
@@ -92,7 +92,7 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
   },
   {
     title: "Keepers",
-    what: "For keeper leagues: is a player worth the pick he costs you?",
+    what: "For keeper leagues only (set League type to Keeper in settings to show this tab): is a player worth the pick he costs you?",
     how: [
       "Set your draft slot and how many keepers you get, then add candidates and the round each would cost.",
       `Keeper value = the player's ${TARGET} VORP minus the value you'd expect to draft with that pick. The best positive values are marked KEEP.`,

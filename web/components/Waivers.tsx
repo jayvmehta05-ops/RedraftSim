@@ -9,21 +9,26 @@ import { POSITIONS } from "@/lib/types";
 import { useLeagueTeams } from "./useLeagueTeams";
 import { Flags, PosBadge, fmt } from "./ui";
 
-export function HorizonToggle({ horizon, setHorizon, weeksLeft }: { horizon: Horizon; setHorizon: (h: Horizon) => void; weeksLeft: number }) {
+/** Redraft leagues value players for the rest of this season only. Keeper leagues can also count next season. */
+export function HorizonToggle({ horizon, setHorizon, keeper }: { horizon: Horizon; setHorizon: (h: Horizon) => void; keeper: boolean }) {
+  if (!keeper) return null;
   return (
     <div className="flex rounded-lg bg-slate-950 p-1 ring-1 ring-slate-800">
-      {([["ros", `Rest of ${SOURCE}`], ["next", `${TARGET} season`], ["both", "Both (keeper)"]] as const).map(([h, label]) => (
-        <button key={h} onClick={() => setHorizon(h)} disabled={h !== "next" && weeksLeft <= 0}
-          className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${horizon === h ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>{label}</button>
+      {([["ros", "This season"], ["both", `This season + ${TARGET} (keeper)`]] as const).map(([h, label]) => (
+        <button key={h} onClick={() => setHorizon(h)}
+          className={`rounded-md px-3 py-1.5 text-xs font-semibold ${horizon === h ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>{label}</button>
       ))}
     </div>
   );
 }
 
-export default function Waivers({ board, cfg, league, myManager, weeksLeft }: {
-  board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string; weeksLeft: number;
+export const horizonLabel = (h: Horizon) => (h === "both" ? `rest of ${SOURCE} + ${TARGET}` : h === "week" ? "this week" : `rest of ${SOURCE}`);
+
+export default function Waivers({ board, cfg, league, myManager, weeksLeft, keeper }: {
+  board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string; weeksLeft: number; keeper: boolean;
 }) {
-  const [horizon, setHorizon] = useState<Horizon>(weeksLeft > 2 ? "ros" : "next");
+  const [picked, setHorizon] = useState<Horizon>("ros");
+  const horizon: Horizon = keeper ? (weeksLeft > 0 ? picked : "both") : "ros"; // offseason keeper leagues look ahead
   const [pos, setPos] = useState<Pos | "ALL">("ALL");
   const { teams, freeAgents } = useLeagueTeams(board, league, horizon, weeksLeft);
   const me = teams.find((t) => t.id === myManager);
@@ -38,7 +43,7 @@ export default function Waivers({ board, cfg, league, myManager, weeksLeft }: {
           <div className="text-sm font-semibold text-white">Waiver wire · {me.name}</div>
           <div className="text-[11px] text-slate-500">{freeAgents.length} unrostered players on our board · ranked by how much each improves your best lineup</div>
         </div>
-        <HorizonToggle horizon={horizon} setHorizon={setHorizon} weeksLeft={weeksLeft} />
+        <HorizonToggle horizon={horizon} setHorizon={setHorizon} keeper={keeper} />
         <div className="flex rounded-lg bg-slate-950 p-1 ring-1 ring-slate-800">
           {(["ALL", ...POSITIONS] as const).map((f) => (
             <button key={f} onClick={() => setPos(f)} className={`rounded-md px-2.5 py-1 text-xs font-semibold ${pos === f ? "bg-slate-700 text-white" : "text-slate-400"}`}>{f}</button>
