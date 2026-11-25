@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-25T05:01:09+00:00",
+ "generatedAt": "2026-11-25T16:39:44+00:00",
  "poolDefinition": "ESPN preseason PPR top 200, veterans only",
  "scoring": "league_settings.json defaults",
  "results": [
@@ -14,18 +14,18 @@
    "metrics": {
     "model": {
      "n": 179,
-     "spearman_points": 0.528,
-     "mae_points": 60.0,
-     "spearman_vorp": 0.512,
+     "spearman_points": 0.54,
+     "mae_points": 59.6,
+     "spearman_vorp": 0.523,
      "spearman_by_pos": {
       "QB": 0.239,
-      "RB": 0.628,
-      "TE": -0.026,
+      "RB": 0.635,
+      "TE": 0.083,
       "WR": 0.466
      },
      "top_n_hit_rate": {
       "QB": 0.583,
-      "RB": 0.708,
+      "RB": 0.75,
       "WR": 0.542,
       "TE": 0.417
      }
@@ -156,7 +156,7 @@
      {
       "name": "Christian McCaffrey",
       "position": "RB",
-      "model_points": 294.1,
+      "model_points": 294.2,
       "espn_points": 335.4,
       "actual_points": 47.8,
       "actual_games": 4
@@ -202,20 +202,20 @@
       "actual_games": 7
      },
      {
-      "name": "Nick Chubb",
-      "position": "RB",
-      "model_points": 191.4,
-      "espn_points": 134.0,
-      "actual_points": 63.3,
-      "actual_games": 8
+      "name": "Evan Engram",
+      "position": "TE",
+      "model_points": 210.3,
+      "espn_points": 183.2,
+      "actual_points": 89.5,
+      "actual_games": 9
      },
      {
-      "name": "T.J. Hockenson",
-      "position": "TE",
-      "model_points": 208.1,
-      "espn_points": 130.0,
-      "actual_points": 86.5,
-      "actual_games": 10
+      "name": "Christian Kirk",
+      "position": "WR",
+      "model_points": 187.1,
+      "espn_points": 205.4,
+      "actual_points": 70.9,
+      "actual_games": 8
      }
     ]
    }
@@ -231,14 +231,14 @@
    "metrics": {
     "model": {
      "n": 174,
-     "spearman_points": 0.623,
-     "mae_points": 62.4,
-     "spearman_vorp": 0.523,
+     "spearman_points": 0.649,
+     "mae_points": 60.2,
+     "spearman_vorp": 0.555,
      "spearman_by_pos": {
       "QB": -0.017,
-      "RB": 0.705,
+      "RB": 0.751,
       "TE": -0.062,
-      "WR": 0.584
+      "WR": 0.625
      },
      "top_n_hit_rate": {
       "QB": 0.667,
@@ -379,28 +379,12 @@
       "actual_games": 4
      },
      {
-      "name": "Joe Mixon",
-      "position": "RB",
-      "model_points": 211.9,
-      "espn_points": 118.0,
-      "actual_points": 0.0,
-      "actual_games": 0
-     },
-     {
       "name": "Jayden Daniels",
       "position": "QB",
       "model_points": 325.3,
       "espn_points": 371.4,
       "actual_points": 114.3,
       "actual_games": 7
-     },
-     {
-      "name": "Brandon Aiyuk",
-      "position": "WR",
-      "model_points": 185.9,
-      "espn_points": 112.4,
-      "actual_points": 0.0,
-      "actual_games": 0
      },
      {
       "name": "Najee Harris",
@@ -427,12 +411,28 @@
       "actual_games": 4
      },
      {
-      "name": "Amari Cooper",
-      "position": "WR",
-      "model_points": 152.5,
-      "espn_points": null,
+      "name": "Joe Mixon",
+      "position": "RB",
+      "model_points": 158.9,
+      "espn_points": 118.0,
       "actual_points": 0.0,
       "actual_games": 0
+     },
+     {
+      "name": "James Conner",
+      "position": "RB",
+      "model_points": 183.4,
+      "espn_points": 250.1,
+      "actual_points": 33.3,
+      "actual_games": 3
+     },
+     {
+      "name": "Brian Thomas Jr.",
+      "position": "WR",
+      "model_points": 281.1,
+      "espn_points": 270.0,
+      "actual_points": 138.8,
+      "actual_games": 14
      }
     ]
    }

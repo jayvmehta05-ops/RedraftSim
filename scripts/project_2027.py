@@ -130,6 +130,76 @@ def injury_adjustment(pos: str, status, body_part, notes) -> tuple[float, float,
     return 1.0, 1.0, None
 
 
+# Sleeper and nflverse disagree on a few team codes; normalize to nflverse.
+TEAM_ALIASES = {"LAR": "LA", "JAC": "JAX", "WSH": "WAS", "OAK": "LV", "SD": "LAC", "STL": "LA"}
+
+
+def norm_team(t):
+    if not isinstance(t, str) or not t or t == "FA":
+        return None
+    return TEAM_ALIASES.get(t, t)
+
+
+RECEIVING = ("targets", "rec", "rec_yds", "rec_td", "rec_2pt")
+RUSHING = ("rush_att", "rush_yds", "rush_td", "rush_2pt")
+
+
+def apply_team_context(df: pd.DataFrame, team_vol: pd.DataFrame, team_qb_eff: pd.Series, pcfg: dict) -> pd.DataFrame:
+    """Team-level opportunity: squeeze or expand each team's projected targets / carries toward that team's
+    historical volume (vacated targets get redistributed, crowded rooms get trimmed), then adjust pass
+    catchers' efficiency for a quarterback change."""
+    alpha = float(pcfg.get("team_pool_alpha", 0.6))
+    reg = float(pcfg.get("team_pool_regress", 0.4))
+    beta = float(pcfg.get("qb_quality_beta", 0.5))
+    lo, hi = float(pcfg.get("team_pool_min", 0.75)), float(pcfg.get("team_pool_max", 1.35))
+    lg_tgt, lg_car = team_vol["targets"].mean(), team_vol["rush_att"].mean()
+    lg_eff = float(team_qb_eff.mean()) if len(team_qb_eff) else None
+    df = df.copy()
+    df["proj"] = [dict(c) for c in df["proj"]]
+    df["notes"] = [list(n) for n in df["notes"]]
+    for team, idx in df.groupby("team_norm").groups.items():
+        if team is None:
+            continue
+        sub = df.loc[idx]
+        g = sub["proj_games"] / 17.0
+        pool_t = (1 - reg) * (team_vol.at[team, "targets"] if team in team_vol.index else lg_tgt) + reg * lg_tgt
+        pool_c = (1 - reg) * (team_vol.at[team, "rush_att"] if team in team_vol.index else lg_car) + reg * lg_car
+        s_t = float(sum(c["targets"] * w for c, w in zip(sub["proj"], g)))
+        s_c = float(sum(c["rush_att"] * w for c, w in zip(sub["proj"], g)))
+        f_t = min(hi, max(lo, pool_t / s_t)) ** alpha if s_t > 0 else 1.0
+        f_c = min(hi, max(lo, pool_c / s_c)) ** alpha if s_c > 0 else 1.0
+        # starting QB for the QB-quality adjustment
+        qbs = sub[sub["position"] == "QB"]
+        new_eff = None
+        if len(qbs):
+            vol = [c["pass_att"] * gm for c, gm in zip(qbs["proj"], qbs["proj_games"])]
+            q = qbs.iloc[int(max(range(len(vol)), key=lambda i: vol[i]))]["proj"]
+            if q["pass_att"] > 5:
+                new_eff = (q["pass_yds"] + 20 * q["pass_td"]) / q["pass_att"]
+        for i in idx:
+            pos = df.at[i, "position"]
+            c = df.at[i, "proj"]
+            if pos != "QB" and abs(f_t - 1) > 0.005:
+                for k in RECEIVING:
+                    c[k] *= f_t
+            if pos != "QB" and abs(f_c - 1) > 0.005:
+                for k in RUSHING:
+                    c[k] *= f_c
+            if pos != "QB" and beta and new_eff and lg_eff:
+                old = team_qb_eff.get(df.at[i, "last_team_norm"], lg_eff)
+                qf = min(1.15, max(0.85, (new_eff / old) ** beta)) if old else 1.0
+                if abs(qf - 1) > 0.01:
+                    c["rec_yds"] *= qf
+                    c["rec_td"] *= qf
+                    df.at[i, "notes"].append(f"QB situation: {'+' if qf > 1 else ''}{qf - 1:.0%} receiving efficiency")
+            if pos != "QB":
+                if abs(f_t - 1) >= 0.05 or abs(f_c - 1) >= 0.05:
+                    what = "vacated" if (f_t + f_c) / 2 > 1 else "crowded"
+                    df.at[i, "notes"].append(f"Team volume ({what} room): targets x{f_t:.2f}, carries x{f_c:.2f}")
+            df.at[i, "proj"] = {k: round(float(v), 4) for k, v in c.items()}
+    return df
+
+
 def shrink(player_num, player_den, league_rate, k):
     """Bayesian shrink of a rate (num/den) toward league_rate with k pseudo-observations."""
     return (player_num + k * league_rate) / (player_den + k)
@@ -164,12 +234,15 @@ def load_espn(con, cfg, season: int, through_week: int) -> tuple[dict, dict]:
 
 def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: pd.DataFrame | None = None,
                               players: pd.DataFrame | None = None, target_start: date = SEASON_2027_START,
-                              exp_offset: int = 2, live_flags: bool = True) -> pd.DataFrame:
+                              exp_offset: int = 2, live_flags: bool = True,
+                              next_roster: dict | None = None) -> pd.DataFrame:
     """Project next season from `season` stats (through `through_week`) plus the prior season.
 
     Backtests pass their own weekly stats (`ws`) and player table, an earlier `target_start` /
     `exp_offset`, and live_flags=False to drop inputs that only exist for the current season
     (Sleeper injury / depth chart / free-agent status and ESPN projections).
+    `next_roster` maps player_id -> (team, status) for the target season (backtests pass Week 1 rosters);
+    live runs use each player's current Sleeper team.
     """
     pcfg = cfg["projection"]
     if ws is None:
@@ -213,6 +286,12 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
 
     a26, a25 = agg(cur.dropna(subset=["player_id"]), True), agg(prv.dropna(subset=["player_id"]), False)
     cur_sums = cur.groupby("player_id")[list(STAT_COMPONENTS)].sum()  # unweighted current-season totals
+    # Team opportunity per game in the source season (all fantasy positions), and team QB efficiency
+    tw = team_wk.loc[season] if season in team_wk.index.get_level_values(0) else team_wk.iloc[0:0]
+    team_vol = tw.groupby(level="team").sum().rename(columns={"team_targets": "targets", "team_rush": "rush_att"})
+    team_vol = team_vol.div(team_games.reindex(team_vol.index).fillna(17).clip(lower=1), axis=0)
+    qb = cur[cur["position"] == "QB"].groupby("team")[["pass_yds", "pass_td", "pass_att"]].sum()
+    team_qb_eff = ((qb["pass_yds"] + 20 * qb["pass_td"]) / qb["pass_att"].clip(lower=1))[qb["pass_att"] > 100]
 
     if players is None:
         players = pd.read_sql_query("SELECT * FROM players WHERE is_rookie_2027 = 0", con).set_index("player_id")
@@ -322,12 +401,29 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
         if age27 and age27 >= 38:
             games *= 0.8; why.append("Retirement risk: -20% games")
 
+        last_team = r26["last_team"] if r26 is not None else (r25["last_team"] if r25 is not None else None)
+        if next_roster is not None:
+            nr = next_roster.get(pid)
+            if nr is None:
+                games *= float(pcfg.get("unsigned_games_mult", 0.35))
+                why.append("Not on a Week 1 roster"); flags.append("free_agent")
+                next_team = None
+            else:
+                next_team, status = nr
+                if status == "RES":
+                    games *= 0.75; why.append("Started the season on reserve (IR/PUP)")
+        else:
+            next_team = p["team"] or None
+        if norm_team(next_team) and norm_team(last_team) and norm_team(next_team) != norm_team(last_team):
+            why.append(f"New team: {last_team} → {next_team}")
+
         # 2026 actual per-game line (unweighted) for display / re-scoring in the browser
         s26 = ({c: round(float(cur_sums.at[pid, c]) / g26, 3) for c in STAT_COMPONENTS}
                if g26 and pid in cur_sums.index else {c: 0.0 for c in STAT_COMPONENTS})
 
         rows.append({
-            "player_id": pid, "name": p["name"], "position": pos, "team": p["team"] or "FA",
+            "player_id": pid, "name": p["name"], "position": pos, "team": next_team or "FA",
+            "team_norm": norm_team(next_team), "last_team_norm": norm_team(last_team),
             "age_2027": age27, "years_exp": None if pd.isna(p["years_exp"]) else int(p["years_exp"]),
             "college": p["college"], "headshot_url": p["headshot_url"], "is_rookie": False,
             "injury_status": p["injury_status"], "injury_body_part": p["injury_body_part"],
@@ -342,7 +438,10 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
             "espn_owned": (espn_mkt.get(pid) or {}).get("owned"),
             "espn_ros": {k: round(v, 4) for k, v in er["pg"].items()} if er else None,
         })
-    return pd.DataFrame(rows)
+    out = pd.DataFrame(rows)
+    if pcfg.get("team_context", True) and len(out):
+        out = apply_team_context(out, team_vol, team_qb_eff, pcfg)
+    return out.drop(columns=["team_norm", "last_team_norm"])
 
 
 def build_rookie_projections(con, target: int = 2027) -> pd.DataFrame:

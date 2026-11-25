@@ -108,6 +108,26 @@ def espn_preseason(season: int, players: pd.DataFrame, espn_to_sleeper: dict) ->
     return df
 
 
+WEEKLY_ROSTER = "https://github.com/nflverse/nflverse-data/releases/download/weekly_rosters/roster_weekly_{season}.csv"
+ON_TEAM = {"ACT", "RES", "INA", "DEV", "EXE"}
+
+
+def week1_roster(season: int, players: pd.DataFrame) -> dict:
+    """player_id -> (team, status) as of Week 1 of `season`: what was knowable before the season started
+    (signings, trades, cuts, retirements, players opening on IR/PUP)."""
+    r = get_csv(WEEKLY_ROSTER.format(season=season))
+    r = r[(r["week"] == r["week"].min()) & (r["position"].isin(FANTASY_POSITIONS)) & (r["status"].isin(ON_TEAM))]
+    by_gsis = players.dropna(subset=["gsis_id"]).drop_duplicates("gsis_id").set_index("gsis_id")["player_id"]
+    sid = r["sleeper_id"].astype("string").str.replace(r"\.0$", "", regex=True)
+    sid = sid.where(sid.isin(set(players["player_id"])), r["gsis_id"].map(by_gsis))
+    out = {}
+    for pid, team, status in zip(sid, r["team"], r["status"]):
+        if isinstance(pid, str) and pid:
+            out[pid] = (team, status)
+    log(f"Week 1 {season} rosters: {len(out)} QB/RB/WR/TE mapped")
+    return out
+
+
 def season_totals(ws: pd.DataFrame, season: int, scoring: dict) -> pd.DataFrame:
     s = ws[ws["season"] == season].dropna(subset=["player_id"])
     g = s.groupby("player_id")
@@ -181,7 +201,8 @@ def biggest_misses(df: pd.DataFrame, n: int = 8) -> dict:
 
 
 # --------------------------------------------------------------------------- main
-def run_target(target: int, cfg: dict, players: pd.DataFrame, espn_to_sleeper: dict, weekly: dict) -> dict:
+def run_target(target: int, cfg: dict, players: pd.DataFrame, espn_to_sleeper: dict, weekly: dict,
+               rosters: dict | None = None) -> dict:
     sc = cfg["scoring"]
     ws = pd.concat([weekly[target - 2], weekly[target - 1], weekly[target]], ignore_index=True)
     last_week = int(ws.loc[ws["season"] == target - 1, "week"].max())
@@ -189,7 +210,8 @@ def run_target(target: int, cfg: dict, players: pd.DataFrame, espn_to_sleeper: d
 
     proj = build_veteran_projections(
         None, cfg, target - 1, last_week, ws=ws[ws["season"] < target], players=pl,
-        target_start=season_start(target), exp_offset=1 + target - SLEEPER_SEASON, live_flags=False)
+        target_start=season_start(target), exp_offset=1 + target - SLEEPER_SEASON, live_flags=False,
+        next_roster=(rosters or {}).get(target))
     proj["model_points"] = [points_per_game(c, p, sc) * g for c, p, g in
                             zip(proj["proj"], proj["position"], proj["proj_games"])]
     proj = proj.set_index("player_id")
@@ -235,7 +257,8 @@ def main() -> None:
         weekly[s] = w
         log(f"nflverse {s}: {len(w)} rows, {w['player_id'].notna().mean():.1%} mapped")
 
-    results = [run_target(t, cfg, players, espn_to_sleeper, weekly) for t in args.targets]
+    rosters = {t: week1_roster(t, players) for t in args.targets}
+    results = [run_target(t, cfg, players, espn_to_sleeper, weekly, rosters) for t in args.targets]
     out = {"generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "poolDefinition": f"ESPN preseason PPR top {POOL_SIZE}, veterans only",
            "scoring": "league_settings.json defaults", "results": results}
