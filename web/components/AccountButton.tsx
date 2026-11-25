@@ -8,6 +8,7 @@ import { reportError } from "@/lib/report";
 
 type Status = "idle" | "syncing" | "synced" | "error";
 const PUSH_EVERY_MS = 4000;
+const RETURN_KEY = "redraft.signInFrom";
 
 function GoogleG() {
   return (
@@ -50,6 +51,15 @@ export default function AccountButton() {
       try {
         primeLastPushed();
         const changed = await pullOnSignIn(sb, u);
+        // Google returns to the home page; send the user back to the page they signed in from
+        const back = sessionStorage.getItem(RETURN_KEY);
+        if (back) {
+          sessionStorage.removeItem(RETURN_KEY);
+          if (back !== window.location.pathname && back.startsWith("/")) {
+            window.location.replace(back);
+            return;
+          }
+        }
         if (changed && reloadOnce()) return; // reload so every tab of the app reads the synced data
         if (cancelled) return;
         setStatus("synced");
@@ -81,7 +91,10 @@ export default function AccountButton() {
   if (!user) {
     return (
       <button
-        onClick={() => sb?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } })}
+        onClick={() => {
+          sessionStorage.setItem(RETURN_KEY, window.location.pathname);
+          void sb?.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+        }}
         className="flex shrink-0 items-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
       >
         <GoogleG /><span className="hidden sm:inline">Sign in</span>

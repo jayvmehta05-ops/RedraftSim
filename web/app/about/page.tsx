@@ -28,7 +28,7 @@ export default function AboutPage() {
         Tuesday during the season. Read <Link href="/guide">how it works</Link>.
       </p>
       <h2>Contact</h2>
-      <p>Ideas, bugs or questions: use the Feedback button on the <Link href="/">main page</Link>. Every message is read.</p>
+      <p>Ideas, bugs or questions: use the Feedback button in <Link href="/app">the app</Link>. Every message is read.</p>
       <p className="text-xs text-slate-500">
         Not affiliated with or endorsed by the NFL, ESPN, Sleeper or Yahoo. <Link href="/privacy">Privacy</Link> · <Link href="/terms">Terms</Link>
       </p>

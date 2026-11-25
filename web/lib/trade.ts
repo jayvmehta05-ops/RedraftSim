@@ -195,6 +195,23 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
     .slice(0, opts.total);
 }
 
+/** The best lineup laid out slot by slot (QB, RB, RB, …, FLEX, SUPERFLEX); empty slots come back as null. */
+export function lineupSlots(roster: Valued[], cfg: LeagueConfig): { slot: string; x: Valued | null }[] {
+  const { starters } = lineupValue(roster, cfg);
+  const left = [...starters];
+  const take = (ok: (x: Valued) => boolean) => {
+    const i = left.findIndex(ok);
+    return i >= 0 ? left.splice(i, 1)[0] : null;
+  };
+  const out: { slot: string; x: Valued | null }[] = [];
+  // Fixed slots first, filled by that position's best players (same order lineupValue used)
+  for (const pos of POSITIONS) for (let i = 0; i < (cfg.roster[pos] ?? 0); i++) out.push({ slot: pos, x: take((x) => x.p.pos === pos) });
+  // Whatever starters remain went to FLEX, then SUPERFLEX
+  for (let i = 0; i < (cfg.roster.FLEX ?? 0); i++) out.push({ slot: "FLEX", x: take((x) => cfg.flex_eligible.includes(x.p.pos)) });
+  for (let i = 0; i < (cfg.roster.SUPERFLEX ?? 0); i++) out.push({ slot: "SFLEX", x: take(() => true) });
+  return out;
+}
+
 /** Each team's starting-lineup strength by position group, for "what do they need" context. */
 export function positionStrength(roster: Valued[], cfg: LeagueConfig): Record<Pos, number> {
   const { starters } = lineupValue(roster, cfg);

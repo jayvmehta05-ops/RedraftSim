@@ -36,7 +36,7 @@ async function SharedCard({ params }: Props) {
           </li>
         ))}
       </ol>
-      <Link href="/" className="mt-6 block rounded-xl bg-emerald-500 py-3 text-center text-sm font-bold text-slate-950 hover:bg-emerald-400">
+      <Link href="/app" className="mt-6 block rounded-xl bg-emerald-500 py-3 text-center text-sm font-bold text-slate-950 hover:bg-emerald-400">
         Run your own {TARGET} mock draft
       </Link>
     </div>

@@ -68,7 +68,7 @@ export default function RisersPage() {
         <List title="Risers" rows={risers} up />
         <List title="Fallers" rows={fallers} up={false} />
       </div>
-      <p className="mt-6 text-sm"><Link href="/" className="text-emerald-400 hover:underline">See the full {TARGET} big board and run a mock draft →</Link></p>
+      <p className="mt-6 text-sm"><Link href="/app" className="text-emerald-400 hover:underline">See the full {TARGET} big board and run a mock draft →</Link></p>
     </main>
     </>
   );

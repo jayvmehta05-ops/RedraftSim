@@ -51,7 +51,7 @@ export default function PrivacyPage() {
       <p>The site isn&apos;t intended for children under 13, and we don&apos;t knowingly collect their information.</p>
 
       <h2>Changes</h2>
-      <p>If this policy changes, we&apos;ll update the date above. Questions? Use the Feedback button on the <Link href="/">main page</Link>.</p>
+      <p>If this policy changes, we&apos;ll update the date above. Questions? Use the Feedback button in <Link href="/app">the app</Link>.</p>
     </LegalPage>
   );
 }

@@ -17,7 +17,7 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <button onClick={retry} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950">Try again</button>
-          <Link href="/" className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-200">Back to the board</Link>
+          <Link href="/app" className="rounded-lg bg-slate-800 px-4 py-2 text-sm text-slate-200">Back to the board</Link>
         </div>
       </div>
     </main>

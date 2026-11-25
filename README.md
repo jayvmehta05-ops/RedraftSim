@@ -146,6 +146,22 @@ Project → Settings → Environment Variables, then redeploy:
 
 Without a destination, feedback only lands in Vercel's runtime logs, which Hobby plans keep for a short time.
 
+### Reading feedback (`scripts/read_feedback.py`)
+
+Webhooks can only post, so reading the channel uses a small **read-only** Discord bot. One-time setup:
+
+1. [Discord Developer Portal](https://discord.com/developers/applications) → **New Application** (any name, e.g. "Feedback reader").
+2. **Bot** tab → turn on **Message Content Intent** → **Reset Token** → copy it into `.env` as `DISCORD_BOT_TOKEN=`.
+   Don't paste the token anywhere else. Anyone holding it can act as the bot.
+3. **OAuth2 → URL Generator**: scope `bot`, permissions **View Channels** + **Read Message History** only. Open the generated
+   URL and add the bot to your server. (Or use `https://discord.com/oauth2/authorize?client_id=<Application ID>&scope=bot&permissions=66560`.)
+4. If the feedback channel is private, add the bot's role to it (channel settings → Permissions).
+5. Discord → User Settings → Advanced → **Developer Mode** on → right-click the feedback channel → **Copy Channel ID** →
+   `.env` as `DISCORD_FEEDBACK_CHANNEL_ID=`.
+
+Then `python scripts/read_feedback.py` prints feedback since the last run (`--all` for the last 100, `--json` for scripts).
+`.env` and the read position (`data/.feedback_state.json`) are git-ignored.
+
 ## Roster refresh and ESPN cookies
 
 - Opening **My League** refreshes rosters automatically when they're more than 12 hours old (from the user's browser; for ESPN

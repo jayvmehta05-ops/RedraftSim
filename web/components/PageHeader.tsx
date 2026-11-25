@@ -14,7 +14,7 @@ export default function PageHeader() {
         <nav className="ml-auto flex shrink-0 gap-1 whitespace-nowrap text-xs font-semibold">
           <Link href="/about" className="hidden rounded-md px-2.5 py-1.5 text-slate-400 hover:bg-slate-900 hover:text-white sm:block">About</Link>
           <Link href="/guide" className="hidden rounded-md px-2.5 py-1.5 text-slate-400 hover:bg-slate-900 hover:text-white sm:block">How it works</Link>
-          <Link href="/" className="rounded-md bg-emerald-500 px-2.5 py-1.5 text-slate-950 hover:bg-emerald-400">Open the board</Link>
+          <Link href="/app" className="rounded-md bg-emerald-500 px-2.5 py-1.5 text-slate-950 hover:bg-emerald-400">Open the app</Link>
         </nav>
       </div>
     </header>

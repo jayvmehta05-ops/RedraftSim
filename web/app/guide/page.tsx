@@ -143,7 +143,7 @@ export default function GuidePage() {
         </p>
       </section>
       <p className="mt-8 text-sm">
-        Questions or ideas? Use the <b>Feedback</b> button on the main page. <Link href="/" className="text-emerald-400 hover:underline">Back to the board →</Link>
+        Questions or ideas? Use the <b>Feedback</b> button on the main page. <Link href="/app" className="text-emerald-400 hover:underline">Back to the board →</Link>
       </p>
     </main>
     </>

@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from "@/lib/types";
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
@@ -223,7 +224,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
     <div className="min-h-screen text-slate-200">
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
-          <Logo className="h-8 w-8 shrink-0" />
+          <Link href="/" aria-label="Home" className="shrink-0"><Logo className="h-8 w-8" /></Link>
           <div className="min-w-0">
             <h1 className="truncate text-base font-bold leading-tight tracking-tight text-white sm:text-lg">
               <span className="text-emerald-400">{TARGET}</span> Redraft Projections<span className="hidden sm:inline"> &amp; Mock Draft</span>

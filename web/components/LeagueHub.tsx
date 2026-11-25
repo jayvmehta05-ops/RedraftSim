@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } from "@/lib/refresh";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
+import MyTeam from "./MyTeam";
 import PowerRankings from "./PowerRankings";
 import TradeAssistant from "./TradeAssistant";
 import Waivers from "./Waivers";
 
-type Section = "trades" | "waivers" | "power";
+type Section = "team" | "trades" | "waivers" | "power";
 
 /** Shown when ESPN needs fresh login cookies for a private league; retries the refresh on submit. */
 function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember: boolean) => void; busy: boolean; error: string | null }) {
@@ -49,7 +50,7 @@ export default function LeagueHub(props: {
   leaguemates: LeaguemateProfile[]; weeksLeft: number; onOpenSettings: () => void;
   onLeagueRefreshed: (l: ImportedLeague) => void; onChooseManager: (id: string | null) => void; onOpenEditor: () => void;
 }) {
-  const [section, setSection] = useState<Section>("trades");
+  const [section, setSection] = useState<Section>("team");
   const { league, myManager, onLeagueRefreshed } = props;
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -85,6 +86,7 @@ export default function LeagueHub(props: {
   // Waivers and power rankings need rosters (and waivers needs your team); the Trades view walks users through that
   const ready = !!league?.rosters?.some((r) => r.playerIds.length || (r.manualIds ?? []).length);
   const sections: { id: Section; label: string; needsMe: boolean }[] = [
+    { id: "team", label: "My team", needsMe: true },
     { id: "trades", label: "Trades", needsMe: true },
     { id: "waivers", label: "Waivers", needsMe: true },
     { id: "power", label: "Power rankings", needsMe: false },
@@ -113,6 +115,9 @@ export default function LeagueHub(props: {
       )}
       {(section === "trades" || blocked) && (
         <TradeAssistant {...props} onRefresh={() => refresh()} refreshing={refreshing} refreshError={needsLogin ? null : refreshError} />
+      )}
+      {section === "team" && !blocked && league && myManager && (
+        <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} onGo={setSection} />
       )}
       {section === "waivers" && !blocked && league && myManager && (
         <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} />
