@@ -31,10 +31,10 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(__file__))
 from common import (  # noqa: E402
     CONFIG_PATH, FANTASY_POSITIONS, STAT_COMPONENTS, WEB_DATA_DIR, config_hash, connect, load_config,
-    points_per_game,
+    points_per_game, resolve_seasons, season_start,
 )
 
-SEASON_2027_START = date(2027, 9, 9)
+SEASON_2027_START = date(2027, 9, 9)  # fallback only; main() passes the resolved target season's kickoff
 RECENCY_DECAY = 0.93          # per-week decay applied to 2026 games (most recent weeks count most)
 MAJOR_INJURY_KEYS = ("acl", "achilles", "lisfranc", "patellar", "mcl", "fracture", "broken", "tib", "fib", "pectoral")
 SEVERE_STATUSES = {"IR", "PUP", "Out", "DNR"}
@@ -126,7 +126,7 @@ def injury_adjustment(pos: str, status, body_part, notes) -> tuple[float, float,
             return 0.88, 0.94 if pos == "RB" else 0.96, f"ACL recovery ({status})"
         return 0.94, 0.97, f"{(body_part or 'Major').strip()} recovery ({status})"
     if status in ("IR", "PUP"):
-        return 0.97, 0.99, f"{(body_part or 'Injury').strip()} — {status}, expected back for 2027"
+        return 0.97, 0.99, f"{(body_part or 'Injury').strip()} — {status}, expected back next season"
     return 1.0, 1.0, None
 
 
@@ -345,7 +345,7 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
     return pd.DataFrame(rows)
 
 
-def build_rookie_projections(con) -> pd.DataFrame:
+def build_rookie_projections(con, target: int = 2027) -> pd.DataFrame:
     rk = pd.read_sql_query("SELECT * FROM rookies", con)
     rows = []
     for _, r in rk.iterrows():
@@ -356,7 +356,7 @@ def build_rookie_projections(con) -> pd.DataFrame:
         for k, v in tpl.items():
             # talent grade scales volume and efficiency (counting stats)
             comp[k] = v * (grade if k not in ("pass_att", "pass_int", "fum_lost") else 1.0)
-        notes = [f"2027 rookie — draft capital tier {tier} (proj. pick {r['projected_pick'] or '?'})"]
+        notes = [f"{target} rookie — draft capital tier {tier} (proj. pick {r['projected_pick'] or '?'})"]
         if grade != 1.0:
             notes.append(f"Talent grade x{grade:.2f}")
         rows.append({
@@ -468,8 +468,10 @@ def history(con, cfg: dict, season: int) -> pd.DataFrame:
 
 
 def run_week(con, cfg, season, week, backfill=False) -> tuple[pd.DataFrame, dict]:
-    vets = build_veteran_projections(con, cfg, season, week)
-    rookies = build_rookie_projections(con)
+    s = cfg["_seasons"]
+    vets = build_veteran_projections(con, cfg, season, week, target_start=season_start(s["target"]),
+                                     exp_offset=1 + s["target"] - s["sleeper"])
+    rookies = build_rookie_projections(con, s["target"])
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", FutureWarning)
         pool = pd.concat([vets, rookies], ignore_index=True)
@@ -547,7 +549,7 @@ def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int
     meta = {
         "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "sourceSeason": season, "throughWeek": week, "previousWeek": prev_week,
-        "targetSeason": cfg["target_season"], "lastIngest": last_run[0] if last_run else None,
+        "targetSeason": cfg["_seasons"]["target"], "lastIngest": last_run[0] if last_run else None,
         "ingestNotes": last_run[1] if last_run else None, "replacement": {"points": rl["points"], "starters": rl["starters"]},
         "marketSource": rl.get("market_source", "sleeper"),
         "publication": pub,
@@ -560,6 +562,9 @@ def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int
     write("board.json", {"meta": meta, "players": players})
     write("trends.json", {"weeks": weeks, "players": trend})
     shutil.copy(CONFIG_PATH, WEB_DATA_DIR / "league_settings.json")
+    # Tiny file every page imports for year labels, so the site rolls over to the next season by itself.
+    s = cfg["_seasons"]
+    write("season.json", {"target": s["target"], "source": s["source"], "prior": s["source"] - 1})
     log(f"exported {len(players)} players, {len(weeks)} trend weeks -> {WEB_DATA_DIR}")
 
 
@@ -571,8 +576,10 @@ def main() -> None:
     args = ap.parse_args()
 
     cfg = load_config()
-    season = int(cfg["source_season"])
     con = connect()
+    season, target, sleeper = resolve_seasons(con, cfg)
+    cfg["_seasons"] = {"source": season, "target": target, "sleeper": sleeper}
+    log(f"projecting {target} from {season} data")
     week = con.execute("SELECT MAX(week) FROM weekly_stats WHERE season = ?", (season,)).fetchone()[0]
     if not week:
         raise SystemExit("No current-season stats in the database; run scripts/update_data.py first.")

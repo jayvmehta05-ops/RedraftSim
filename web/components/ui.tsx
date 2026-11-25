@@ -1,4 +1,5 @@
 import type { Pos } from "@/lib/types";
+import { TARGET, yy } from "@/lib/season";
 
 export const POS_STYLE: Record<Pos, string> = {
   QB: "bg-rose-500/15 text-rose-300 ring-rose-500/30",
@@ -49,7 +50,7 @@ export function Delta({ value, suffix }: { value: number | null | undefined; suf
 }
 
 const FLAG_INFO: Record<string, { label: string; cls: string; title: string }> = {
-  rookie: { label: "R27", cls: "bg-violet-500/20 text-violet-300", title: "2027 incoming rookie" },
+  rookie: { label: `R${yy(TARGET)}`, cls: "bg-violet-500/20 text-violet-300", title: `${TARGET} incoming rookie` },
   ascending: { label: "▲Yr", cls: "bg-emerald-500/15 text-emerald-300", title: "Year 2/3 ascension bump" },
   age_decline: { label: "Age", cls: "bg-orange-500/15 text-orange-300", title: "Age-curve penalty" },
   injury_recovery: { label: "INJ", cls: "bg-red-500/20 text-red-300", title: "Injury recovery flag" },

@@ -5,6 +5,7 @@ import type { LeagueConfig, RankedPlayer } from "@/lib/types";
 import { roundPick } from "@/lib/engine";
 import { teamPickIndices } from "@/lib/draft";
 import { PosBadge, TierBadge, fmt } from "./ui";
+import { TARGET } from "@/lib/season";
 
 interface Keeper { id: string; round: number }
 const KEY = "redraft27.keepers";
@@ -73,7 +74,7 @@ export default function KeeperCalc({ board, cfg }: { board: RankedPlayer[]; cfg:
         <div>
           <h2 className="text-base font-semibold text-white">Keeper calculator</h2>
           <p className="mt-1 text-xs text-slate-400">
-            Add the players you could keep and the round each would cost. Value is the 2027 VORP you gain over the player
+            Add the players you could keep and the round each would cost. Value is the {TARGET} VORP you gain over the player
             you&apos;d expect to draft with that pick.
           </p>
         </div>
@@ -115,7 +116,7 @@ export default function KeeperCalc({ board, cfg }: { board: RankedPlayer[]; cfg:
             <thead className="bg-slate-900 text-[11px] uppercase tracking-wide text-slate-400">
               <tr>
                 <th className="px-3 py-2 text-left">Player</th><th className="px-2 py-2 text-left">Cost round</th>
-                <th className="px-2 py-2 text-left">Pick given up</th><th className="px-2 py-2 text-left">2027 ADP</th>
+                <th className="px-2 py-2 text-left">Pick given up</th><th className="px-2 py-2 text-left">{TARGET} ADP</th>
                 <th className="px-2 py-2 text-left">VORP</th><th className="px-2 py-2 text-left">Expected at pick</th>
                 <th className="px-2 py-2 text-left">Keeper value</th><th className="px-2 py-2" />
               </tr>

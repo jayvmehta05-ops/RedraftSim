@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import backtestJson from "@/data/backtest.json";
+import { SITE_NAME, TARGET } from "@/lib/season";
 
 interface MethodMetrics {
   n: number;
@@ -22,7 +23,7 @@ interface Result {
 const bt = backtestJson as unknown as { generatedAt: string; poolDefinition: string; results: Result[] };
 
 export const metadata: Metadata = {
-  title: "Projection accuracy — 2027 Redraft Sim",
+  title: `Projection accuracy — ${SITE_NAME}`,
   description: "Out-of-sample backtest of the Redraft Sim projection model against ESPN preseason projections, ESPN rankings and a last-year baseline.",
 };
 
@@ -46,10 +47,10 @@ function Cell({ v, b, d = 2 }: { v: number | null; b: number; d?: number }) {
 export default function AccuracyPage() {
   return (
     <main className="mx-auto max-w-5xl px-4 py-8 text-slate-200">
-      <Link href="/" className="text-sm text-emerald-400 hover:underline">← 2027 Redraft Sim</Link>
+      <Link href="/" className="text-sm text-emerald-400 hover:underline">← {SITE_NAME}</Link>
       <h1 className="mt-3 text-2xl font-bold text-white">How accurate are the projections?</h1>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
-        Each season below was projected using only the two seasons before it, with the same engine that builds the 2027 board,
+        Each season below was projected using only the two seasons before it, with the same engine that builds the {TARGET} board,
         then scored against what actually happened. Players: {bt.poolDefinition} (rookies need a draft-capital model and are
         scored separately). Higher correlation is better; lower average miss is better. Best value per column in green.
       </p>

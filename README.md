@@ -66,6 +66,14 @@ Each run stores a snapshot (`snapshots` + `projections` tables) keyed by week an
 > **Backfill caveat:** `--backfill` rebuilds earlier weeks from the stats available at that time, but it uses the *current* Sleeper
 > injury/depth-chart data and ESPN ADP, and ESPN weekly projections as they stand now. Only snapshots from the weekly runs themselves are true point-in-time records.
 
+## Season rollover
+
+`source_season` / `target_season` are `"auto"` in `config/league_settings.json`. Each run, `update_data.py` picks the newest
+season with completed regular-season games as the source and projects the year after it, so the board projects 2027 during the
+2026 season and its offseason, then rolls to 2028 once 2027 games start. Every year label on the site comes from
+`web/data/season.json`. The one manual step each spring: create `data/rookies_<target>.csv` for the new draft class (copy the
+previous file's columns); until it exists the board shows no incoming rookies and the run logs a warning.
+
 ## League settings
 
 Edit `config/league_settings.json` to change the defaults (teams, roster, scoring, rounds). In the app, the **Settings** drawer

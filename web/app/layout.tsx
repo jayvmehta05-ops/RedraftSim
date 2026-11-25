@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { SITE_NAME, TARGET } from "@/lib/season";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -13,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "2027 Redraft Sim",
-  description: "Self-updating 2027 fantasy football redraft projections, VORP big board and 12-team mock draft simulator.",
+  title: SITE_NAME,
+  description: `Self-updating ${TARGET} fantasy football redraft projections, VORP big board and 12-team mock draft simulator.`,
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

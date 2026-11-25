@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { ImportedLeague, LeagueConfig, Replacement, Toggles } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
+import { PRIOR, SOURCE } from "@/lib/season";
 
 interface Props {
   open: boolean;
@@ -23,7 +24,7 @@ const ESPN_AUTH_KEY = "redraft27.espnAuth";
 function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Props, "league" | "onImport" | "myManager" | "onChooseManager">) {
   const [provider, setProvider] = useState<"sleeper" | "espn">("sleeper");
   const [id, setId] = useState("");
-  const [season, setSeason] = useState(2026);
+  const [season, setSeason] = useState(SOURCE);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPrivate, setShowPrivate] = useState(false);
@@ -126,7 +127,7 @@ function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Pro
         {provider === "espn" && (
           <select value={season} onChange={(e) => setSeason(Number(e.target.value))}
             className="rounded-md bg-slate-800 px-2 py-1.5 text-sm text-slate-200 ring-1 ring-slate-700">
-            {[2026, 2025].map((y) => <option key={y} value={y}>{y}</option>)}
+            {[SOURCE, PRIOR].map((y) => <option key={y} value={y}>{y}</option>)}
           </select>
         )}
       </div>

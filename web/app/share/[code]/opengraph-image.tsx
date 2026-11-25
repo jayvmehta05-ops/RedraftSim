@@ -1,7 +1,8 @@
 import { ImageResponse } from "next/og";
 import { decodeMock } from "@/lib/share";
+import { TARGET } from "@/lib/season";
 
-export const alt = "2027 mock draft result";
+export const alt = `${TARGET} mock draft result`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -12,7 +13,7 @@ export default async function Image({ params }: { params: Promise<{ code: string
     (
       <div style={{ width: "100%", height: "100%", display: "flex", background: "#020617", color: "white", padding: 64, fontFamily: "sans-serif" }}>
         <div style={{ display: "flex", flexDirection: "column", width: 420 }}>
-          <div style={{ fontSize: 28, color: "#34d399", letterSpacing: 4 }}>2027 MOCK DRAFT</div>
+          <div style={{ fontSize: 28, color: "#34d399", letterSpacing: 4 }}>{TARGET} MOCK DRAFT</div>
           <div style={{ fontSize: 220, fontWeight: 900, lineHeight: 1 }}>{m?.g ?? "?"}</div>
           <div style={{ fontSize: 34, color: "#94a3b8", marginTop: 16 }}>
             {m ? `Pick 1.${String(m.s).padStart(2, "0")} · #${m.r} of ${m.t}` : "Redraft Sim"}

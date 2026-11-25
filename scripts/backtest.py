@@ -29,7 +29,8 @@ import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
 from common import (  # noqa: E402
-    DATA_DIR, FANTASY_POSITIONS, STAT_COMPONENTS, WEB_DATA_DIR, load_config, merge_name, points_per_game,
+    DATA_DIR, FANTASY_POSITIONS, STAT_COMPONENTS, WEB_DATA_DIR, connect, get_meta, load_config, merge_name,
+    points_per_game, season_start,
 )
 from project_2027 import build_veteran_projections, clean_json, replacement_levels  # noqa: E402
 from update_data import (  # noqa: E402
@@ -39,7 +40,8 @@ from update_data import (  # noqa: E402
 
 POOL_SIZE = 200
 TOP_N = {"QB": 12, "RB": 24, "WR": 24, "TE": 12}
-SEASON_START = {2023: date(2023, 9, 7), 2024: date(2024, 9, 5), 2025: date(2025, 9, 4), 2026: date(2026, 9, 9)}
+# Sleeper's years_exp counts from its current season; needed to turn it into "season number" in past years.
+SLEEPER_SEASON = int(get_meta(connect(), "sleeper_season", 2026))
 
 
 def log(msg: str) -> None:
@@ -187,7 +189,7 @@ def run_target(target: int, cfg: dict, players: pd.DataFrame, espn_to_sleeper: d
 
     proj = build_veteran_projections(
         None, cfg, target - 1, last_week, ws=ws[ws["season"] < target], players=pl,
-        target_start=SEASON_START[target], exp_offset=1 + target - 2026, live_flags=False)
+        target_start=season_start(target), exp_offset=1 + target - SLEEPER_SEASON, live_flags=False)
     proj["model_points"] = [points_per_game(c, p, sc) * g for c, p, g in
                             zip(proj["proj"], proj["position"], proj["proj_games"])]
     proj = proj.set_index("player_id")

@@ -1,14 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { SITE_NAME, TARGET } from "@/lib/season";
 
 export const metadata: Metadata = {
-  title: "How it works — 2027 Redraft Sim",
-  description: "What every tool on 2027 Redraft Sim does and how to use it: the 2027 big board, league import, mock drafts against your real leaguemates, live draft help, keepers and more.",
+  title: `How it works — ${SITE_NAME}`,
+  description: `What every tool on ${SITE_NAME} does and how to use it: the ${TARGET} big board, league import, mock drafts against your real leaguemates, live draft help, keepers and more.`,
 };
 
 const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] = [
   {
-    title: "2027 Big Board",
+    title: `${TARGET} Big Board`,
     what: "A ranked top 250 for next season's redraft leagues, rebuilt every Tuesday from this season's games. Each player shows projected 2027 points per game, value over replacement (VORP), a tier, a projected draft position (ADP) and how far they moved this week.",
     how: [
       "Filter by position or rookies, search by name, team or college, and sort by any column.",
@@ -50,12 +51,12 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
     what: "For keeper leagues: is a player worth the pick he costs you?",
     how: [
       "Set your draft slot and how many keepers you get, then add candidates and the round each would cost.",
-      "Keeper value = the player's 2027 VORP minus the value you'd expect to draft with that pick. The best positive values are marked KEEP.",
+      `Keeper value = the player's ${TARGET} VORP minus the value you'd expect to draft with that pick. The best positive values are marked KEEP.`,
     ],
   },
   {
     title: "Weekly Trends and risers",
-    what: "Who's moving up or down for 2027, week by week.",
+    what: `Who's moving up or down for ${TARGET}, week by week.`,
     how: [
       "Use the Weekly Trends tab for 1-week, 3-week or season windows by position.",
       "The /risers page lists this week's biggest movers and is easy to share.",
@@ -71,10 +72,10 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
 export default function GuidePage() {
   return (
     <main className="mx-auto max-w-3xl px-4 py-8 text-slate-200">
-      <Link href="/" className="text-sm text-emerald-400 hover:underline">← 2027 Redraft Sim</Link>
+      <Link href="/" className="text-sm text-emerald-400 hover:underline">← {SITE_NAME}</Link>
       <h1 className="mt-3 text-2xl font-bold text-white">How it works</h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-400">
-        2027 Redraft Sim projects next season for redraft fantasy football and gives you tools to plan your draft: a big board
+        {SITE_NAME} projects next season for redraft fantasy football and gives you tools to plan your draft: a big board
         that updates every week, mock drafts against bots (or your actual leaguemates), live draft help and a keeper calculator.
         It&apos;s built for 12-team, 1QB, full-PPR leagues by default, and adapts to your league&apos;s settings.
       </p>

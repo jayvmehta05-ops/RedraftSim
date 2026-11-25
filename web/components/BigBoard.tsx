@@ -4,6 +4,7 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LeagueConfig, Pos, RankedPlayer } from "@/lib/types";
 import { roundPick } from "@/lib/engine";
 import { Delta, Flags, PosBadge, TierBadge, fmt, pct, thumb } from "./ui";
+import { PRIOR, SOURCE, TARGET, yy } from "@/lib/season";
 
 type Filter = "ALL" | Pos | "ROOKIES";
 const FILTERS: Filter[] = ["ALL", "QB", "RB", "WR", "TE", "ROOKIES"];
@@ -120,11 +121,11 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
               <Th sort={sort} setSort={setSort} className="w-12">Tier</Th>
               <Th sort={sort} setSort={setSort} k="adp" className="w-20">ADP</Th>
               {showEspn && <Th sort={sort} setSort={setSort} k="espn" className="w-20">ESPN ADP</Th>}
-              <Th sort={sort} setSort={setSort} k="ppg" className="w-20">27 PPG</Th>
-              <Th sort={sort} setSort={setSort} className="w-16">27 Pts</Th>
+              <Th sort={sort} setSort={setSort} k="ppg" className="w-20">{yy(TARGET)} PPG</Th>
+              <Th sort={sort} setSort={setSort} className="w-16">{yy(TARGET)} Pts</Th>
               <Th sort={sort} setSort={setSort} k="vorp" className="w-16">VORP</Th>
-              <Th sort={sort} setSort={setSort} className="w-12">26 G</Th>
-              <Th sort={sort} setSort={setSort} k="ppg26" className="w-16">26 PPG</Th>
+              <Th sort={sort} setSort={setSort} className="w-12">{yy(SOURCE)} G</Th>
+              <Th sort={sort} setSort={setSort} k="ppg26" className="w-16">{yy(SOURCE)} PPG</Th>
               <Th sort={sort} setSort={setSort} className="w-20">Tgt / Tch</Th>
             </tr>
           </thead>
@@ -165,7 +166,7 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
                           </div>
                           <div className="text-[11px] text-slate-500">
                             {p.rookie ? `${p.college ?? ""} · Rookie` : p.team}
-                            {p.age != null && ` · ${p.age.toFixed(1)} yo in '27`}
+                            {p.age != null && ` · ${p.age.toFixed(1)} yo in '${yy(TARGET)}`}
                             {p.injury && <span className="text-red-400"> · {p.injury}{p.injuryPart ? ` (${p.injuryPart})` : ""}</span>}
                           </div>
                         </div>
@@ -195,7 +196,7 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
                         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                           <div>
                             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              2027 projected per game · {fmt(p.projGames, 1)} games
+                              {TARGET} projected per game · {fmt(p.projGames, 1)} games
                             </div>
                             <StatLine p={p} />
                             <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Model adjustments</div>
@@ -204,9 +205,9 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
                             </ul>
                           </div>
                           <div className="text-xs text-slate-400 md:text-right">
-                            {!p.rookie && <div>2025: {p.g25} G · 2026: {p.g26} G</div>}
+                            {!p.rookie && <div>{PRIOR}: {p.g25} G · {SOURCE}: {p.g26} G</div>}
                             {p.espnAdp != null && <div>ESPN ADP: {fmt(p.espnAdp)}{p.espnOwned != null ? ` · ${p.espnOwned.toFixed(1)}% rostered` : ""}</div>}
-                            {p.cur.espnRosPpg != null && <div>ESPN rest-of-2026 proj: {fmt(p.cur.espnRosPpg)} PPG</div>}
+                            {p.cur.espnRosPpg != null && <div>ESPN rest-of-{SOURCE} proj: {fmt(p.cur.espnRosPpg)} PPG</div>}
                             {p.marketRank != null && <div>Market rank: {p.marketRank}</div>}
                             {p.rookie && <div>Draft capital tier {p.draftTier}</div>}
                           </div>

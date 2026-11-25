@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Pos, RankedPlayer, TrendData } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
 import { Delta, PosBadge, Sparkline, fmt } from "./ui";
+import { SOURCE, TARGET } from "@/lib/season";
 
 interface Mover {
   p: RankedPlayer;
@@ -109,7 +110,7 @@ export default function TrendTracker({ board, trends, throughWeek }: { board: Ra
             {[60, 120, 180, 250].map((v) => <option key={v} value={v}>Top {v}</option>)}
           </select>
         </label>
-        <span className="text-xs text-slate-500">Projected 2027 ADP, snapshots after 2026 Week {startWeek} → Week {throughWeek}</span>
+        <span className="text-xs text-slate-500">Projected {TARGET} ADP, snapshots after {SOURCE} Week {startWeek} → Week {throughWeek}</span>
       </div>
       {weeks.length < 2 ? (
         <p className="rounded-xl bg-slate-900 p-6 text-sm text-slate-400 ring-1 ring-slate-800">

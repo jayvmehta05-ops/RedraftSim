@@ -61,7 +61,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/fantasy_2027.db data/rookies_2027.csv web/data
+          git add data/fantasy_2027.db data/rookies_*.csv web/data
           if git diff --cached --quiet; then
             echo "No data changes this week."
           else

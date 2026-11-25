@@ -12,6 +12,7 @@ import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { encodeMock } from "@/lib/share";
 import { MockSurvey } from "./Feedback";
 import { Flags, POS_CELL, PosBadge, TierBadge, fmt } from "./ui";
+import { TARGET, yy } from "@/lib/season";
 
 type Phase = "setup" | "live" | "done";
 const SPEEDS = [
@@ -155,7 +156,7 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
       <section className="mx-auto max-w-3xl rounded-2xl bg-slate-900 p-6 ring-1 ring-slate-800">
         <h2 className="text-lg font-semibold text-white">{teams}-Team Mock Draft Room</h2>
         <p className="mt-1 text-sm text-slate-400">
-          {cfg.draft_rounds}-round snake draft vs. {teams - 1} AI bots drafting from the live 2027 ADP + VORP board with roster-need logic for
+          {cfg.draft_rounds}-round snake draft vs. {teams - 1} AI bots drafting from the live {TARGET} ADP + VORP board with roster-need logic for
           {" "}{cfg.roster.QB} QB · {cfg.roster.RB} RB · {cfg.roster.WR} WR · {cfg.roster.TE} TE · {cfg.roster.FLEX} FLEX.
           {reservedRounds > 0 && ` Rounds ${rounds + 1}–${cfg.draft_rounds} are reserved for ${reserved.map((x) => x.slot).join(" and ")} (not projected).`}
         </p>
@@ -229,7 +230,7 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
     const url = `${window.location.origin}/share/${code}`;
     try {
       const canShare = typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches;
-      if (canShare) await navigator.share({ title: "My 2027 mock draft", url });
+      if (canShare) await navigator.share({ title: `My ${TARGET} mock draft`, url });
       else await navigator.clipboard.writeText(url);
       setShareMsg(canShare ? "Shared!" : "Link copied!");
     } catch {
@@ -329,7 +330,7 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
                     <td className="px-2 py-1.5 tabular-nums text-slate-400">{p.cur.adp}</td>
                     <td className="px-2 py-1.5">
                       <span className="font-medium text-white">{p.name}</span>
-                      <span className="ml-1.5 text-[11px] text-slate-500">{p.rookie ? "R27" : p.team}</span>
+                      <span className="ml-1.5 text-[11px] text-slate-500">{p.rookie ? `R${yy(TARGET)}` : p.team}</span>
                       <span className="ml-1.5"><Flags flags={p.flags.filter((f) => f !== "rookie")} notes={p.notes} /></span>
                       {suggestedIds.has(p.id) && <span className="ml-1.5 rounded bg-emerald-500/20 px-1 text-[10px] font-semibold text-emerald-300">SUGGESTED</span>}
                     </td>

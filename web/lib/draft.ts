@@ -29,7 +29,7 @@ export const BOT_PROFILES: BotProfile[] = [
   { name: "Hero-RB Hank", style: "Anchor RB, then WR", noise: 2.5, posBias: { RB: 4, WR: 1 }, runSensitivity: 1, rookieBias: 0, vorpWeight: 1 },
   { name: "Early-QB Quinn", style: "Takes an elite QB early", noise: 2.5, posBias: { QB: 9 }, runSensitivity: 1, rookieBias: 0, vorpWeight: 1 },
   { name: "TE Truther", style: "Pays up for an elite TE", noise: 2.5, posBias: { TE: 7 }, runSensitivity: 1, rookieBias: 0, vorpWeight: 1 },
-  { name: "Rookie Fever Rita", style: "Chases 2027 rookie upside", noise: 3, posBias: {}, runSensitivity: 1, rookieBias: 6, vorpWeight: 0.8 },
+  { name: "Rookie Fever Rita", style: "Chases rookie upside", noise: 3, posBias: {}, runSensitivity: 1, rookieBias: 6, vorpWeight: 0.8 },
   { name: "Vet Vince", style: "Proven producers only", noise: 2, posBias: {}, runSensitivity: 0.8, rookieBias: -8, vorpWeight: 1.2 },
   { name: "Run-Chaser Ray", style: "Follows every positional run", noise: 2.5, posBias: {}, runSensitivity: 2.2, rookieBias: 0, vorpWeight: 0.9 },
   { name: "VORP Valerie", style: "Pure value-over-replacement", noise: 1.5, posBias: {}, runSensitivity: 0.3, rookieBias: 0, vorpWeight: 2.2 },

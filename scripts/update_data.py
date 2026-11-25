@@ -27,7 +27,7 @@ import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
 from common import (  # noqa: E402
-    FANTASY_POSITIONS, ROOKIES_CSV, STAT_COMPONENTS, connect, load_config, merge_name, slugify,
+    FANTASY_POSITIONS, STAT_COMPONENTS, connect, load_config, merge_name, rookies_csv, set_meta, slugify,
 )
 
 SLEEPER = "https://api.sleeper.app/v1"
@@ -238,7 +238,7 @@ def fetch_espn(con, season: int, players: pd.DataFrame, espn_to_sleeper: dict, n
 
 
 # --------------------------------------------------------------------------- rookies
-def fetch_rookie_updates() -> None:
+def fetch_rookie_updates(path) -> None:
     """Hook: merge an external prospect board into rookies_2027.csv.
 
     Set ROOKIE_SOURCE_URL to a CSV with the same columns (e.g. a published Google Sheet).
@@ -253,7 +253,7 @@ def fetch_rookie_updates() -> None:
     except Exception as e:
         log(f"WARN rookie source fetch failed: {e}")
         return
-    local = pd.read_csv(ROOKIES_CSV)
+    local = pd.read_csv(path)
     local_keys = set(local["name"].map(merge_name))
     for _, r in remote.iterrows():
         k = merge_name(r["name"])
@@ -264,15 +264,20 @@ def fetch_rookie_updates() -> None:
             for col in remote.columns:
                 if col in local.columns and pd.isna(local.at[idx, col]) and pd.notna(r[col]):
                     local.at[idx, col] = r[col]
-    local.to_csv(ROOKIES_CSV, index=False)
+    local.to_csv(path, index=False)
     log(f"rookie hook merged {len(remote)} rows from ROOKIE_SOURCE_URL")
 
 
-def load_rookies(con, now: str) -> int:
-    fetch_rookie_updates()
-    rk = pd.read_csv(ROOKIES_CSV)
+def load_rookies(con, now: str, target: int) -> int:
+    path = rookies_csv(target)
     con.execute("DELETE FROM rookies")
     con.execute("DELETE FROM players WHERE is_rookie_2027 = 1")
+    if not path.exists():
+        log(f"WARN {path.name} not found: no incoming rookies on the {target} board. Copy last year's file, "
+            f"rename it to {path.name} and fill in the new prospect class.")
+        return 0
+    fetch_rookie_updates(path)
+    rk = pd.read_csv(path)
     for _, r in rk.iterrows():
         if r["position"] not in FANTASY_POSITIONS:
             continue
@@ -300,19 +305,37 @@ def main() -> None:
     args = ap.parse_args()
 
     cfg = load_config()
-    season = int(cfg["source_season"])
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     con = connect()
 
     state = get_json(f"{SLEEPER}/state/nfl")
-    sleeper_week = int(state.get("week") or 0) if str(state.get("season")) == str(season) else 18
     log(f"Sleeper state: season={state.get('season')} week={state.get('week')} ({state.get('season_type')})")
+    sleeper_season = int(state.get("season") or datetime.now().year)
+
+    # --- Source season: the newest one with completed regular-season games (auto), or the config value
+    if str(cfg.get("source_season", "auto")) == "auto":
+        season, stats = sleeper_season, None
+        try:
+            stats = fetch_nflverse_weekly(season)
+        except requests.HTTPError:
+            stats = None
+        if stats is None or stats.empty:
+            log(f"no {season} regular-season games yet; projecting from {season - 1}")
+            season -= 1
+            stats = fetch_nflverse_weekly(season)
+        target = season + 1
+    else:
+        season = int(cfg["source_season"])
+        target = int(cfg["target_season"]) if str(cfg.get("target_season", "auto")) != "auto" else season + 1
+        stats = fetch_nflverse_weekly(season)
+    set_meta(con, "source_season", season)
+    set_meta(con, "target_season", target)
+    set_meta(con, "sleeper_season", sleeper_season)
+    log(f"seasons: projecting {target} from {season} data")
+    sleeper_week = int(state.get("week") or 0) if str(state.get("season")) == str(season) else 18
 
     players, espn_to_sleeper = fetch_players(now)
     log(f"Sleeper players (QB/RB/WR/TE, active or rostered): {len(players)}")
-
-    # --- current season from nflverse
-    stats = fetch_nflverse_weekly(season)
     nflverse_through = int(stats["week"].max()) if len(stats) else 0
     log(f"nflverse {season}: {len(stats)} rows through week {nflverse_through}")
 
@@ -355,8 +378,8 @@ def main() -> None:
 
     espn_note = fetch_espn(con, season, players, espn_to_sleeper, now)
 
-    n_rookies = load_rookies(con, now)
-    log(f"2027 rookie prospects loaded: {n_rookies}")
+    n_rookies = load_rookies(con, now, target)
+    log(f"{target} rookie prospects loaded: {n_rookies}")
 
     mapped = con.execute("SELECT AVG(player_id IS NOT NULL) FROM weekly_stats WHERE season = ?", (season,)).fetchone()[0]
     con.execute(

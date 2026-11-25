@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from datetime import date, timedelta
 import re
 import sqlite3
 import unicodedata
@@ -12,7 +13,9 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG_PATH = ROOT / "config" / "league_settings.json"
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "fantasy_2027.db"
-ROOKIES_CSV = DATA_DIR / "rookies_2027.csv"
+def rookies_csv(target_season: int) -> Path:
+    """Prospect list for the draft class entering `target_season` (e.g. data/rookies_2028.csv)."""
+    return DATA_DIR / f"rookies_{target_season}.csv"
 WEB_DATA_DIR = ROOT / "web" / "data"
 
 FANTASY_POSITIONS = ("QB", "RB", "WR", "TE")
@@ -125,6 +128,12 @@ CREATE TABLE IF NOT EXISTS espn_market_history (
     PRIMARY KEY (fetch_date, espn_id)
 );
 
+-- Key/value facts the pipeline resolves at ingest time (e.g. which seasons are source / target).
+CREATE TABLE IF NOT EXISTS pipeline_meta (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS ingest_runs (
     run_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     run_at        TEXT NOT NULL,
@@ -167,6 +176,39 @@ CREATE INDEX IF NOT EXISTS idx_proj_player ON projections(player_id);
 def load_config() -> dict:
     with open(CONFIG_PATH, encoding="utf-8") as f:
         return json.load(f)
+
+
+def season_start(year: int) -> date:
+    """NFL kickoff ≈ the Thursday after Labor Day (first Monday of September)."""
+    d = date(year, 9, 1)
+    labor_day = d + timedelta(days=(7 - d.weekday()) % 7)
+    return labor_day + timedelta(days=3)
+
+
+def set_meta(con, key: str, value) -> None:
+    con.execute("INSERT OR REPLACE INTO pipeline_meta VALUES (?, ?)", (key, str(value)))
+
+
+def get_meta(con, key: str, default=None):
+    row = con.execute("SELECT value FROM pipeline_meta WHERE key = ?", (key,)).fetchone()
+    return row[0] if row else default
+
+
+def resolve_seasons(con, cfg: dict) -> tuple[int, int, int]:
+    """(source season, target season, Sleeper's current season).
+
+    With "source_season": "auto" (the default) the source is the newest season with completed NFL games,
+    as recorded by update_data.py, and the target is the year after. So the board projects 2027 during
+    the 2026 season and its offseason, and rolls to 2028 once 2027 games start.
+    """
+    if str(cfg.get("source_season", "auto")) != "auto":
+        source = int(cfg["source_season"])
+        target = int(cfg["target_season"]) if str(cfg.get("target_season", "auto")) != "auto" else source + 1
+        return source, target, int(get_meta(con, "sleeper_season", source))
+    source = get_meta(con, "source_season")
+    if source is None:
+        raise SystemExit("Seasons not resolved yet; run scripts/update_data.py first.")
+    return int(source), int(get_meta(con, "target_season")), int(get_meta(con, "sleeper_season", source))
 
 
 def config_hash(cfg: dict) -> str:

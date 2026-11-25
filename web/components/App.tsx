@@ -11,9 +11,10 @@ import LiveDraft from "./LiveDraft";
 import MockDraft from "./MockDraft";
 import SettingsDrawer from "./SettingsDrawer";
 import TrendTracker from "./TrendTracker";
+import { TARGET } from "@/lib/season";
 
 const TABS = [
-  { id: "board", label: "2027 Big Board" },
+  { id: "board", label: `${TARGET} Big Board` },
   { id: "mock", label: "Mock Draft Room" },
   { id: "live", label: "Live Draft" },
   { id: "keepers", label: "Keepers" },
@@ -122,7 +123,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
           <div>
             <h1 className="text-lg font-bold tracking-tight text-white">
-              <span className="text-emerald-400">2027</span> Redraft Projections &amp; Mock Draft
+              <span className="text-emerald-400">{TARGET}</span> Redraft Projections &amp; Mock Draft
             </h1>
             <p className="text-xs text-slate-500">
               Data through {m.sourceSeason} Week {m.throughWeek} · updated {updated} · auto-refreshes every Tuesday
@@ -165,7 +166,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         Sources: Sleeper public API (players, injuries, depth charts), ESPN fantasy API (ADP, roster %, rest-of-season
         projections{m.marketSource === "espn" ? "; ESPN ADP is the market signal" : "; ESPN unavailable, Sleeper rank used as market"}),
         nflverse weekly player stats, DynastyProcess ID map,
-        editable data/rookies_2027.csv. Projections are model estimates, not guarantees.
+        an editable list of the incoming {TARGET} rookie class. Projections are model estimates, not guarantees.
       </footer>
 
       <FeedbackButton context={{ tab, league: league ? league.provider : "none" }} />
