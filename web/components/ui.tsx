@@ -97,6 +97,18 @@ export function Sparkline({ values, width = 90, height = 24, invert = true }: { 
   );
 }
 
+/**
+ * nflverse headshots point at full-size NFL photos (~700 KB each). NFL's image CDN accepts resize
+ * transforms in the URL, so request a small face-cropped thumbnail instead (~2 KB).
+ */
+export function thumb(url: string | null, size = 64): string | null {
+  if (!url) return null;
+  const t = `f_auto,q_auto,w_${size},h_${size},c_fill,g_face`;
+  if (url.includes("/f_auto,q_auto/")) return url.replace("/f_auto,q_auto/", `/${t}/`);
+  if (url.includes("static.www.nfl.com/image/upload/")) return url.replace("/image/upload/", `/image/upload/${t}/`);
+  return url;
+}
+
 export function fmt(n: number | null | undefined, d = 1) {
   return n == null || Number.isNaN(n) ? "—" : n.toFixed(d);
 }

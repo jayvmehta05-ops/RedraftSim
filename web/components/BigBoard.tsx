@@ -1,12 +1,14 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LeagueConfig, Pos, RankedPlayer } from "@/lib/types";
 import { roundPick } from "@/lib/engine";
-import { Delta, Flags, PosBadge, TierBadge, fmt, pct } from "./ui";
+import { Delta, Flags, PosBadge, TierBadge, fmt, pct, thumb } from "./ui";
 
 type Filter = "ALL" | Pos | "ROOKIES";
 const FILTERS: Filter[] = ["ALL", "QB", "RB", "WR", "TE", "ROOKIES"];
+// Rows rendered per batch; more are added as the user scrolls (keeps re-renders cheap on phones).
+const PAGE = 60;
 type SortKey = "rank" | "adp" | "espn" | "ppg" | "vorp" | "ppg26" | "delta";
 
 function StatLine({ p }: { p: RankedPlayer }) {
@@ -68,6 +70,22 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
 
   const showTierBreaks = sort === "rank" && !q;
 
+  // Progressive rendering: the visible count resets whenever the filter / search / sort changes.
+  const listKey = `${filter}|${q}|${sort}`;
+  const [shown, setShown] = useState({ key: listKey, n: PAGE });
+  const limit = shown.key === listKey ? shown.n : PAGE;
+  const visible = rows.slice(0, limit);
+  const sentinel = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || limit >= rows.length) return;
+    const io = new IntersectionObserver((entries) => {
+      if (entries.some((e) => e.isIntersecting)) setShown({ key: listKey, n: limit + PAGE });
+    }, { rootMargin: "800px" });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [limit, rows.length, listKey]);
+
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -108,8 +126,8 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
             </tr>
           </thead>
           <tbody>
-            {rows.map((p, i) => {
-              const prev = rows[i - 1];
+            {visible.map((p, i) => {
+              const prev = visible[i - 1];
               const tierBreak = showTierBreaks && prev && prev.cur.tier !== p.cur.tier && filter === "ALL";
               return (
                 <Fragment key={p.id}>
@@ -133,7 +151,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
                       <div className="flex items-center gap-2">
                         {p.headshot ? (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.headshot} alt="" className="h-7 w-7 rounded-full bg-slate-800 object-cover" loading="lazy" />
+                          <img src={thumb(p.headshot)!} alt="" width={28} height={28} className="h-7 w-7 rounded-full bg-slate-800 object-cover" loading="lazy" decoding="async" />
                         ) : (
                           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-[10px] text-slate-500">{p.pos}</div>
                         )}
@@ -197,6 +215,11 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
           </tbody>
         </table>
       </div>
+      {limit < rows.length && (
+        <div ref={sentinel} className="py-4 text-center text-xs text-slate-500">
+          Showing {limit} of {rows.length} — scroll for more
+        </div>
+      )}
     </section>
   );
 }
