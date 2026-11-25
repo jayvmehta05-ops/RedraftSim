@@ -212,6 +212,7 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
         return out
 
     a26, a25 = agg(cur.dropna(subset=["player_id"]), True), agg(prv.dropna(subset=["player_id"]), False)
+    cur_sums = cur.groupby("player_id")[list(STAT_COMPONENTS)].sum()  # unweighted current-season totals
 
     if players is None:
         players = pd.read_sql_query("SELECT * FROM players WHERE is_rookie_2027 = 0", con).set_index("player_id")
@@ -264,7 +265,10 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
         ypt = shrink(raw["rec_yds"], n_tgt, L["ypt"], 60)
         rectd = (1 - td_reg) * shrink(raw["rec_td"], n_tgt, L["rectd"], 30) + td_reg * L["rectd"]
         ypc = shrink(raw["rush_yds"], n_car, L["ypc"], 80)
-        rushtd = (1 - td_reg) * shrink(raw["rush_td"], n_car, L["rushtd"], 40) + td_reg * L["rushtd"]
+        # QB rushing TDs (goal-line sneaks, designed runs) are stickier than the QB average suggests,
+        # because that average is dragged down by kneel-downs; allow a separate regression weight.
+        rtd_reg = float(pcfg.get("td_regression_by_pos", {}).get(pos, td_reg))
+        rushtd = (1 - rtd_reg) * shrink(raw["rush_td"], n_car, L["rushtd"], 40) + rtd_reg * L["rushtd"]
         cmp_ = shrink(raw["pass_cmp"], n_att, L["cmp"], 150)
         ypa = shrink(raw["pass_yds"], n_att, L["ypa"], 200)
         passtd = (1 - td_reg) * shrink(raw["pass_td"], n_att, L["passtd"], 150) + td_reg * L["passtd"]
@@ -319,8 +323,8 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
             games *= 0.8; why.append("Retirement risk: -20% games")
 
         # 2026 actual per-game line (unweighted) for display / re-scoring in the browser
-        s26 = {c: round(float(cur.loc[cur["player_id"] == pid, c].sum()) / g26, 3) if g26 else 0.0
-               for c in STAT_COMPONENTS}
+        s26 = ({c: round(float(cur_sums.at[pid, c]) / g26, 3) for c in STAT_COMPONENTS}
+               if g26 and pid in cur_sums.index else {c: 0.0 for c in STAT_COMPONENTS})
 
         rows.append({
             "player_id": pid, "name": p["name"], "position": pos, "team": p["team"] or "FA",

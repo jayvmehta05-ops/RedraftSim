@@ -96,6 +96,8 @@ def espn_preseason(season: int, players: pd.DataFrame, espn_to_sleeper: dict) ->
         if proj:
             st = proj[0].get("stats") or {}
             comp = {c: float(st.get(k, 0) or 0) for k, c in ESPN_STAT_IDS.items()}
+            if not any(comp.values()):  # ESPN's archive has empty projection lines for some seasons (e.g. 2023)
+                comp = None
         rows.append({"player_id": sid, "espn_name": p.get("fullName"), "position": pos,
                      "espn_rank": rank, "espn_comp": comp})
     df = pd.DataFrame(rows).dropna(subset=["player_id"]).drop_duplicates("player_id")

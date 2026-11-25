@@ -75,5 +75,10 @@
     "espn_projection_weight": 0.3,
     "espn_lookahead_weeks": 6,
     "market_source": "espn"
+  },
+  "publication": {
+    "show_headshots": true,
+    "show_espn_fields": true,
+    "_note": "Set both to false before charging money: NFL headshots are copyrighted and ESPN's terms restrict commercial reuse of its data."
   }
 }

@@ -89,6 +89,39 @@ Each bot scores the top 24 available players (by active-settings ADP) on:
 
 After the draft, every team is graded on projected starter points.
 
+## App features
+
+| Where | What |
+| --- | --- |
+| Big Board | Top 250 for 2027 with tiers, VORP, ADP, ESPN ADP, weekly movement; Settings toggles (FLEX, superflex, PPR, pass TD, TE premium) re-rank instantly |
+| Settings → Import your league | Sleeper (any league ID) or public ESPN leagues via `/api/league`: roster slots incl. superflex, scoring incl. TE premium, past drafts. Private ESPN leagues can't be read without the owner's login cookies, which the app never asks for |
+| Mock Draft Room | Snake draft vs. AI personalities, or vs. bots that draft like your real leaguemates (positional tendencies by round, learned from past drafts). Finished mocks get a share link (`/share/<code>`) with a generated preview image |
+| Live Draft | Follows a real Sleeper draft (public draft API, polled every 5 s) and ranks your next pick |
+| Keepers | Keeper value = 2027 VORP minus the expected VORP at the pick you give up |
+| Weekly Trends, `/risers` | Week-over-week ADP movement; `/risers` is a static, search-friendly page that refreshes every Tuesday |
+| `/accuracy` | Out-of-sample backtest results (`scripts/backtest.py`) |
+
+## Accuracy backtest
+
+`python scripts/backtest.py` projects 2024 and 2025 using only the two seasons before each, with the same engine minus
+current-season-only inputs, and scores the result against actual fantasy points. Pool: ESPN's preseason PPR top 200 veterans.
+
+| Season | Model rank corr | ESPN projections | ESPN rankings | Same as last year |
+| --- | --- | --- | --- | --- |
+| 2024 | 0.53 | 0.66 | 0.58 | 0.47 |
+| 2025 | 0.62 | 0.68 | 0.49 | 0.52 |
+
+The model beats the "same as last year" baseline every season and beat ESPN's rankings in 2025, but trails ESPN's own
+projections, mostly at QB and TE. ESPN's preseason numbers include offseason news (trades, depth charts, injuries) the
+backtest deliberately leaves out. A grid search over the main model knobs (prior-season weight, TD regression, recency decay,
+availability weight) moved results by less than 0.01, so the gap is about missing inputs, not tuning. ESPN's archive has empty
+2023 projections, so 2023 can't be compared.
+
+## Before charging money
+
+Set `publication.show_headshots` and `publication.show_espn_fields` to `false` in `config/league_settings.json`: NFL headshots
+are copyrighted and ESPN's terms restrict commercial reuse of its data. Get a legal review of data sources before launch.
+
 ## Weekly automation
 
 `.github/workflows/weekly_update.yml` runs every **Tuesday at 11:00 UTC** (and on manual dispatch, with an optional backfill). It ingests data,

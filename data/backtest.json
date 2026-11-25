@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-25T04:38:11+00:00",
+ "generatedAt": "2026-11-25T05:00:15+00:00",
  "poolDefinition": "ESPN preseason PPR top 200, veterans only",
  "scoring": "league_settings.json defaults",
  "results": [
@@ -31,15 +31,15 @@
      }
     },
     "espn": {
-     "n": 179,
-     "spearman_points": 0.655,
-     "mae_points": 54.0,
+     "n": 177,
+     "spearman_points": 0.656,
+     "mae_points": 53.4,
      "spearman_vorp": 0.605,
      "spearman_by_pos": {
       "QB": 0.447,
-      "RB": 0.688,
+      "RB": 0.708,
       "TE": 0.129,
-      "WR": 0.576
+      "WR": 0.563
      },
      "top_n_hit_rate": {
       "QB": 0.667,
@@ -248,15 +248,15 @@
      }
     },
     "espn": {
-     "n": 174,
-     "spearman_points": 0.684,
-     "mae_points": 65.2,
-     "spearman_vorp": 0.592,
+     "n": 173,
+     "spearman_points": 0.679,
+     "mae_points": 65.6,
+     "spearman_vorp": 0.585,
      "spearman_by_pos": {
       "QB": -0.026,
       "RB": 0.769,
       "TE": 0.229,
-      "WR": 0.63
+      "WR": 0.614
      },
      "top_n_hit_rate": {
       "QB": 0.5,
@@ -430,7 +430,7 @@
       "name": "Amari Cooper",
       "position": "WR",
       "model_points": 152.5,
-      "espn_points": 0.0,
+      "espn_points": NaN,
       "actual_points": 0.0,
       "actual_games": 0
      }
