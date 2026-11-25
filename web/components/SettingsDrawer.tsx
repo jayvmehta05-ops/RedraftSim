@@ -18,11 +18,69 @@ interface Props {
   myManager: string | null;
   onChooseManager: (id: string | null) => void;
   onOpenEditor: () => void;
+  savedLeagues: { key: string; name: string; provider: string }[];
+  activeKey: string | null;
+  onSwitchLeague: (key: string) => void;
 }
 
 const ESPN_AUTH_KEY = "redraft27.espnAuth";
 
-function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEditor }: Pick<Props, "league" | "onImport" | "myManager" | "onChooseManager" | "onOpenEditor">) {
+/** Download / restore everything this site keeps in the browser (leagues, leaguemate edits, keepers, settings).
+ *  ESPN login cookies are deliberately left out of the file. */
+function BackupRestore() {
+  const [msg, setMsg] = useState<string | null>(null);
+  const backup = (stamp: number) => {
+    try {
+      const data: Record<string, string> = {};
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith("redraft") && k !== ESPN_AUTH_KEY) data[k] = localStorage.getItem(k) ?? "";
+      }
+      const blob = new Blob([JSON.stringify({ app: "redraft-sim", version: 1, exportedAt: new Date(stamp).toISOString(), data }, null, 1)],
+        { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `redraft-sim-backup-${new Date(stamp).toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setMsg(`Saved ${Object.keys(data).length} items to your downloads.`);
+    } catch {
+      setMsg("Couldn't read this browser's storage.");
+    }
+  };
+  const restore = async (file: File | undefined) => {
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      if (parsed?.app !== "redraft-sim" || typeof parsed.data !== "object") throw new Error("not a backup");
+      const entries = Object.entries(parsed.data as Record<string, string>).filter(([k, v]) => k.startsWith("redraft") && typeof v === "string");
+      entries.forEach(([k, v]) => localStorage.setItem(k, v));
+      setMsg(`Restored ${entries.length} items. Reloading…`);
+      setTimeout(() => window.location.reload(), 600);
+    } catch {
+      setMsg("That file isn't a Redraft Sim backup.");
+    }
+  };
+  return (
+    <div className="mt-3 border-t border-slate-800 pt-3">
+      <div className="flex gap-2">
+        <button onClick={(e) => backup(e.timeStamp + performance.timeOrigin)}
+          className="flex-1 rounded-lg bg-slate-800 px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-slate-700">Back up my data</button>
+        <label className="flex-1 cursor-pointer rounded-lg bg-slate-800 px-3 py-2 text-center text-xs font-semibold text-slate-200 hover:bg-slate-700">
+          Restore backup
+          <input type="file" accept="application/json,.json" className="hidden" onChange={(e) => restore(e.target.files?.[0])} />
+        </label>
+      </div>
+      <p className="mt-1.5 text-[10px] leading-relaxed text-slate-500">
+        {msg ?? "Your leagues, leaguemate notes, keepers and settings live only in this browser until accounts arrive. Back them up to a file to move devices."}
+      </p>
+    </div>
+  );
+}
+
+function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEditor, savedLeagues, activeKey, onSwitchLeague }:
+  Pick<Props, "league" | "onImport" | "myManager" | "onChooseManager" | "onOpenEditor" | "savedLeagues" | "activeKey" | "onSwitchLeague">) {
+  const [addingAnother, setAddingAnother] = useState(false);
   const [provider, setProvider] = useState<"sleeper" | "espn">("sleeper");
   const [id, setId] = useState("");
   const [season, setSeason] = useState(SOURCE);
@@ -71,6 +129,7 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
       if (!r.ok) throw new Error(body.error ?? `Import failed (${r.status})`);
       onImport(body as ImportedLeague);
       setId("");
+      setAddingAnother(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Import failed");
     } finally {
@@ -78,11 +137,22 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
     }
   };
 
-  if (league) {
+  if (league && !addingAnother) {
     const picks = league.drafts.reduce((s, d) => s + d.picks.length, 0);
     return (
       <div className="py-4">
-        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Your league</h3>
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">Your league</h3>
+          <button onClick={() => setAddingAnother(true)} className="text-[11px] font-semibold text-emerald-400 hover:underline">+ Add another league</button>
+        </div>
+        {savedLeagues.length > 1 && (
+          <select value={activeKey ?? ""} onChange={(e) => onSwitchLeague(e.target.value)} aria-label="Switch league"
+            className="mb-2 w-full rounded-md bg-slate-800 px-2 py-1.5 text-sm text-slate-200 ring-1 ring-slate-700">
+            {savedLeagues.map((l) => (
+              <option key={l.key} value={l.key}>{l.name} ({l.provider === "manual" ? "by hand" : l.provider === "espn" ? "ESPN" : "Sleeper"})</option>
+            ))}
+          </select>
+        )}
         <div className="rounded-lg bg-emerald-500/10 p-3 ring-1 ring-emerald-500/30">
           <div className="text-sm font-semibold text-white">{league.name}</div>
           <div className="text-xs text-slate-400">
@@ -108,14 +178,17 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
           Describe leaguemates &amp; edit rosters
         </button>
         <button onClick={() => onImport(null)} className="mt-3 block text-xs text-slate-400 underline hover:text-white">
-          Remove league and go back to the site defaults
+          {savedLeagues.length > 1 ? "Remove this league" : "Remove league and go back to the site defaults"}
         </button>
       </div>
     );
   }
   return (
     <div className="py-4">
-      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Import your league</h3>
+      <div className="mb-1 flex items-center justify-between">
+        <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-400">{league ? "Add another league" : "Import your league"}</h3>
+        {league && <button onClick={() => setAddingAnother(false)} className="text-[11px] text-slate-400 hover:text-white">Cancel</button>}
+      </div>
       <p className="mb-2 text-[11px] text-slate-500">Loads your roster slots, scoring and past drafts. Sleeper works for any league; ESPN leagues must be public.</p>
       <div className="flex gap-1 rounded-lg bg-slate-800/70 p-1">
         {(["sleeper", "espn"] as const).map((p) => (
@@ -201,7 +274,7 @@ function Seg({ label, hint, value, options: preset, onPick }: {
   );
 }
 
-export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement, league, onImport, myManager, onChooseManager, onOpenEditor }: Props) {
+export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement, league, onImport, myManager, onChooseManager, onOpenEditor, savedLeagues, activeKey, onSwitchLeague }: Props) {
   const set = (patch: Partial<Toggles>) => onChange({ ...toggles, ...patch });
   const r = cfg.roster;
   return (
@@ -222,7 +295,8 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
           <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Close settings">✕</button>
         </div>
         <div className="flex-1 divide-y divide-slate-800 overflow-y-auto px-5">
-          <LeagueImport league={league} onImport={onImport} myManager={myManager} onChooseManager={onChooseManager} onOpenEditor={onOpenEditor} />
+          <LeagueImport league={league} onImport={onImport} myManager={myManager} onChooseManager={onChooseManager} onOpenEditor={onOpenEditor}
+            savedLeagues={savedLeagues} activeKey={activeKey} onSwitchLeague={onSwitchLeague} />
           <Seg label="FLEX spots" hint="RB / WR / TE" value={toggles.flexCount}
             options={[{ v: 1, label: "1 FLEX" }, { v: 2, label: "2 FLEX" }]} onPick={(v) => set({ flexCount: v })} />
           <Seg label="Superflex" hint="flex spot a QB can fill" value={toggles.superflex}
@@ -261,6 +335,7 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
           >
             {league ? `Reset to ${league.name} settings` : "Reset to site defaults"}
           </button>
+          <BackupRestore />
         </div>
       </aside>
     </>

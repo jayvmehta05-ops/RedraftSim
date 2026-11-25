@@ -9,7 +9,7 @@
  * Feedback is never filed in a public repo (checked on every post). Without any destination it is
  * only written to the server log, which Vercel keeps for a short time.
  */
-const KINDS = ["general", "bug", "idea", "projections", "mock_realism"] as const;
+const KINDS = ["general", "bug", "idea", "projections", "mock_realism", "error"] as const;
 const recent = new Map<string, number[]>(); // best-effort per-instance rate limit
 
 function rateLimited(ip: string) {
@@ -30,7 +30,7 @@ interface Feedback {
 
 function summary(f: Feedback, includeEmail: boolean) {
   const lines = [
-    `**${f.kind.replace("_", " ")}**${f.score != null ? ` · score ${f.score}${f.kind === "mock_realism" ? "/5" : "/10"}` : ""}`,
+    `${f.kind === "error" ? "🚨 " : ""}**${f.kind.replace("_", " ")}**${f.score != null ? ` · score ${f.score}${f.kind === "mock_realism" ? "/5" : "/10"}` : ""}`,
     f.message || "(no comment)",
     Object.entries(f.context).map(([k, v]) => `${k}: ${v}`).join(" · "),
   ];
@@ -81,6 +81,7 @@ export async function POST(request: Request) {
   const maxScore = kind === "mock_realism" ? 5 : 10;
   const score = b.score == null || b.score === "" || !Number.isFinite(scoreNum) ? null : Math.max(0, Math.min(maxScore, Math.round(scoreNum)));
   const message = typeof b.message === "string" ? b.message.trim().slice(0, 2000) : "";
+  if (kind === "error" && !message) return Response.json({ error: "Missing error message" }, { status: 400 });
   const emailRaw = typeof b.email === "string" ? b.email.trim().slice(0, 120) : "";
   const email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailRaw) ? emailRaw : null;
   if (!message && score == null) return Response.json({ error: "Add a score or a comment." }, { status: 400 });

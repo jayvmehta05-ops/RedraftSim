@@ -146,6 +146,17 @@ Project → Settings → Environment Variables, then redeploy:
 
 Without a destination, feedback only lands in Vercel's runtime logs, which Hobby plans keep for a short time.
 
+## Reliability and data
+
+- **Error reports:** uncaught errors, failed promises and crashes (`app/error.tsx`) are posted to `/api/feedback` as kind `error`,
+  deduplicated and capped at 5 per browser session, so they arrive in the same private Discord/Slack channel as feedback.
+- **Saved leagues:** every import is kept (`redraft27.savedLeagues`) with a switcher in Settings; your team and leaguemate edits
+  are remembered per league.
+- **Backup / restore:** Settings → Back up my data downloads everything the site stores in the browser (ESPN cookies excluded);
+  Restore loads it on another device. Accounts will replace this.
+- **Analytics:** `@vercel/analytics` is installed; enable Web Analytics in Vercel → Project → Analytics to start collecting
+  page views (privacy-friendly, no cookies).
+
 ## Private ESPN leagues
 
 ESPN has no third-party sign-in, so private leagues use the viewer's own `espn_s2` and `SWID` cookies. They're sent in a POST body

@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
+import ErrorReporter from "@/components/ErrorReporter";
 import { SITE_NAME, TARGET } from "@/lib/season";
 
 const geistSans = Geist({
@@ -28,7 +30,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full">{children}</body>
+      <body className="min-h-full">
+        <ErrorReporter />
+        {children}
+        {/* Page-view analytics; collects nothing until Web Analytics is enabled in the Vercel dashboard */}
+        <Analytics />
+      </body>
     </html>
   );
 }

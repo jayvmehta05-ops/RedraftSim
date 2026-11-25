@@ -31,7 +31,9 @@ type Tab = (typeof TABS)[number]["id"];
 const STORAGE_KEY = "redraft27.toggles";
 const LEAGUE_KEY = "redraft27.league";
 const ME_KEY = "redraft27.myManager";
-const PROFILES_KEY = "redraft27.profiles"; // { "<provider>:<leagueId>": { managerId: ProfileOverride } }
+const PROFILES_KEY = "redraft27.profiles";
+const SAVED_KEY = "redraft27.savedLeagues"; // { "<provider>:<leagueId>": ImportedLeague }
+const MYS_KEY = "redraft27.myManagers";     // { "<provider>:<leagueId>": managerId } // { "<provider>:<leagueId>": { managerId: ProfileOverride } }
 const leagueKey = (l: ImportedLeague | null) => (l ? `${l.provider}:${l.leagueId}` : "none");
 
 /** The site's default config with an imported league's teams, roster, scoring and draft length applied. */
@@ -59,6 +61,8 @@ function save(key: string, value: unknown) {
 export default function App({ data, trends, config: siteConfig }: { data: BoardData; trends: TrendData; config: LeagueConfig }) {
   const [league, setLeague] = useState<ImportedLeague | null>(null);
   const [myManager, setMyManager] = useState<string | null>(null);
+  const [savedLeagues, setSavedLeagues] = useState<Record<string, ImportedLeague>>({});
+  const [myManagers, setMyManagers] = useState<Record<string, string>>({});
   const config = useMemo(() => withLeague(siteConfig, league), [siteConfig, league]);
   const learned = useMemo(() => (league ? buildLeaguemateBots(league) : []), [league]);
   const [allOverrides, setAllOverrides] = useState<Record<string, Record<string, ProfileOverride>>>({});
@@ -84,42 +88,88 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   useEffect(() => {
     try {
       const saved = localStorage.getItem(LEAGUE_KEY);
+      const active: ImportedLeague | null = saved ? JSON.parse(saved) : null;
+      const all: Record<string, ImportedLeague> = JSON.parse(localStorage.getItem(SAVED_KEY) ?? "{}");
+      const mys: Record<string, string> = JSON.parse(localStorage.getItem(MYS_KEY) ?? "{}");
+      const me = localStorage.getItem(ME_KEY);
+      if (active && !all[leagueKey(active)]) all[leagueKey(active)] = active; // migrate single-league storage
+      if (active && me && !mys[leagueKey(active)]) mys[leagueKey(active)] = me;
       // eslint-disable-next-line react-hooks/set-state-in-effect
-      if (saved) setLeague(JSON.parse(saved));
-      setMyManager(localStorage.getItem(ME_KEY));
+      setLeague(active);
+      setMyManager(me);
+      setSavedLeagues(all);
+      setMyManagers(mys);
       setAllOverrides(JSON.parse(localStorage.getItem(PROFILES_KEY) ?? "{}"));
     } catch {
       /* storage unavailable */
     }
   }, []);
-  const importLeague = (lg: ImportedLeague | null) => {
+  const storeSaved = (next: Record<string, ImportedLeague>) => {
+    setSavedLeagues(next);
+    save(SAVED_KEY, next);
+  };
+  // Make `lg` the active league: restore your team in it and its default scoring toggles
+  const activate = (lg: ImportedLeague | null, mys = myManagers) => {
     setLeague(lg);
     save(LEAGUE_KEY, lg);
-    setMyManager(null);
-    save(ME_KEY, null);
+    const me = lg ? mys[leagueKey(lg)] ?? null : null;
+    setMyManager(me);
+    save(ME_KEY, me);
     const t = defaultToggles(withLeague(siteConfig, lg));
     setToggles(t);
     save(STORAGE_KEY, t);
+  };
+  // New import (kept alongside your other leagues), or null to remove the active league
+  const importLeague = (lg: ImportedLeague | null) => {
+    if (!lg) {
+      const next = { ...savedLeagues };
+      if (league) delete next[leagueKey(league)];
+      storeSaved(next);
+      activate(Object.values(next)[0] ?? null);
+      return;
+    }
+    let incoming = lg;
+    if (lg.provider === "manual") {
+      // hand-made leagues get a unique id so two of them never overwrite each other
+      let n = 1;
+      while (savedLeagues[`manual:${lg.leagueId}-${n}`]) n += 1;
+      incoming = { ...lg, leagueId: `${lg.leagueId}-${n}` };
+    }
+    storeSaved({ ...savedLeagues, [leagueKey(incoming)]: incoming });
+    activate(incoming);
+    return incoming;
+  };
+  const switchLeague = (key: string) => {
+    const lg = savedLeagues[key];
+    if (lg) activate(lg);
   };
   // Re-imported league (e.g. refreshed rosters): keep the chosen team and current toggles
   const refreshLeague = (lg: ImportedLeague) => {
     const merged = keepRosterEdits(league, lg);
     setLeague(merged);
     save(LEAGUE_KEY, merged);
+    storeSaved({ ...savedLeagues, [leagueKey(merged)]: merged });
   };
   // From the leaguemate editor: a hand-made league is created, or an existing one is edited
   const editLeague = (lg: ImportedLeague) => {
     if (!league) {
-      importLeague(lg);
-      if (lg.provider === "manual" && lg.managers[0]) chooseManager(lg.managers[0].id);
+      const created = importLeague(lg);
+      if (created && created.provider === "manual" && created.managers[0]) chooseManager(created.managers[0].id, created);
       return;
     }
     setLeague(lg);
     save(LEAGUE_KEY, lg);
+    storeSaved({ ...savedLeagues, [leagueKey(lg)]: lg });
   };
-  const chooseManager = (id: string | null) => {
+  const chooseManager = (id: string | null, forLeague: ImportedLeague | null = league) => {
     setMyManager(id);
     save(ME_KEY, id);
+    if (forLeague) {
+      const next = { ...myManagers };
+      if (id) next[leagueKey(forLeague)] = id; else delete next[leagueKey(forLeague)];
+      setMyManagers(next);
+      save(MYS_KEY, next);
+    }
   };
 
   // Restore per-browser settings (best effort)
@@ -243,7 +293,9 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       <FeedbackButton context={{ tab, league: league ? league.provider : "none" }} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} toggles={toggles} defaults={defaults}
         onChange={updateToggles} cfg={cfg} replacement={replacement}
-        league={league} onImport={importLeague} myManager={myManager} onChooseManager={chooseManager}
+        league={league} onImport={importLeague} myManager={myManager} onChooseManager={(id) => chooseManager(id)}
+        savedLeagues={Object.entries(savedLeagues).map(([key, l]) => ({ key, name: l.name, provider: l.provider }))}
+        activeKey={league ? leagueKey(league) : null} onSwitchLeague={switchLeague}
         onOpenEditor={() => { setSettingsOpen(false); setEditorOpen(true); }} />
       <LeagueEditor open={editorOpen} onClose={() => setEditorOpen(false)} board={board} cfg={cfg} league={league}
         learned={learned} overrides={overrides} onOverrides={setOverrides} onLeagueChange={editLeague} myManager={myManager} />
