@@ -202,6 +202,8 @@ export interface ImportedLeague {
     weekTrades?: boolean;
     /** keeper features on/off for this league (overrides what the platform reported in `kind`) */
     keeper?: boolean;
+    /** board player ids that can't be traded right now (e.g. on a 1-week trade); kept across refreshes */
+    locked?: string[];
   };
   /** league format as the platform reports it */
   kind?: "redraft" | "keeper" | "dynasty";

@@ -8,9 +8,9 @@ import { SOURCE } from "@/lib/season";
 import {
   type Horizon, type Partner, type TradeEval, type Valued, evaluateTrade, findTrades, playerValue, positionStrength,
 } from "@/lib/trade";
-import { IconSwap } from "./icons";
+import { IconLock, IconSwap, IconUnlock } from "./icons";
 import { HorizonToggle, horizonLabel } from "./Waivers";
-import { resolveRoster, unmatchedCount } from "@/lib/rosters";
+import { lockedSet, resolveRoster, toggleLock, unmatchedCount } from "@/lib/rosters";
 import { PosBadge, fmt } from "./ui";
 
 interface Props {
@@ -28,6 +28,8 @@ interface Props {
   onOpenEditor: () => void;
   /** provided by My League: re-import rosters (handles ESPN login prompts) */
   onRefresh: () => void;
+  /** save a hand edit to the league (locking a player) */
+  onLeagueEdit: (l: ImportedLeague) => void;
   refreshing: boolean;
   refreshError: string | null;
 }
@@ -95,7 +97,7 @@ function Empty({ title, body, action, error }: { title: string; body: string; ac
   );
 }
 
-export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, keeper, onOpenSettings, onChooseManager, onOpenEditor, onRefresh, refreshing, refreshError }: Props) {
+export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, keeper, onOpenSettings, onChooseManager, onOpenEditor, onRefresh, onLeagueEdit, refreshing, refreshError }: Props) {
   const [picked, setHorizon] = useState<Horizon>("ros");
   const horizon: Horizon = keeper ? (weeksLeft > 0 ? picked : "both") : "ros"; // offseason keeper leagues look ahead
   const [partnerId, setPartnerId] = useState<string | null>(null);
@@ -106,6 +108,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
   const byEspn = useMemo(() => new Map(board.filter((p) => p.espnId).map((p) => [String(p.espnId), p])), [board]);
   const names = useMemo(() => new Map((league?.managers ?? []).map((m) => [m.id, m.name])), [league]);
   const leans = useMemo(() => new Map(leaguemates.map((l) => [l.managerId, l])), [leaguemates]);
+  const locked = useMemo(() => lockedSet(league), [league]);
 
   const teams = useMemo(() => {
     if (!league?.rosters) return [];
@@ -119,9 +122,9 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
   const me = teams.find((t) => t.id === myManager) ?? null;
   const partners: Partner[] = teams.filter((t) => t.id !== myManager).map((t) => ({ id: t.id, name: t.name, roster: t.roster, lean: leans.get(t.id) }));
   const suggestions = useMemo(
-    () => (me ? findTrades(me.roster, partners, cfg) : []),
+    () => (me ? findTrades(me.roster, partners, cfg, undefined, locked) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [me, teams, cfg],
+    [me, teams, cfg, locked],
   );
 
   const leagueAvg = useMemo(() => {
@@ -160,8 +163,8 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
 
   // ------------------------------------------------------------------ analyzer
   const partner = partners.find((p) => p.id === partnerId) ?? null;
-  const giveP = me.roster.filter((x) => give.has(x.p.id)).map((x) => x.p);
-  const getP = partner ? partner.roster.filter((x) => get.has(x.p.id)).map((x) => x.p) : [];
+  const giveP = me.roster.filter((x) => give.has(x.p.id) && !locked.has(x.p.id)).map((x) => x.p);
+  const getP = partner ? partner.roster.filter((x) => get.has(x.p.id) && !locked.has(x.p.id)).map((x) => x.p) : [];
   const custom = partner && (giveP.length || getP.length) ? evaluateTrade(me.roster, partner.roster, giveP, getP, cfg, partner.id, partner.lean) : null;
   const toggle = (set: Set<string>, id: string, fn: (s: Set<string>) => void) => {
     const n = new Set(set);
@@ -235,18 +238,33 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
             <div key={col.title}>
               <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">{col.title}</div>
               <div className="max-h-72 space-y-0.5 overflow-y-auto pr-1">
-                {[...col.roster].sort((a, b) => b.v - a.v).map((x) => (
-                  <label key={x.p.id} className={`flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-sm ${col.set.has(x.p.id) ? "bg-emerald-500/10" : "hover:bg-slate-800/60"}`}>
-                    <input type="checkbox" checked={col.set.has(x.p.id)} onChange={() => toggle(col.set, x.p.id, col.fn)} className="accent-emerald-500" />
-                    <PosBadge pos={x.p.pos} />
-                    <span className="flex-1 truncate text-slate-200">{x.p.name}</span>
-                    <span className="text-xs tabular-nums text-slate-500">{fmt(x.v, 0)}</span>
-                  </label>
-                ))}
+                {[...col.roster].sort((a, b) => b.v - a.v).map((x) => {
+                  const isLocked = locked.has(x.p.id);
+                  return (
+                    <div key={x.p.id} className={`flex items-center gap-2 rounded-md px-2 py-1 text-sm ${isLocked ? "opacity-60" : col.set.has(x.p.id) ? "bg-emerald-500/10" : "hover:bg-slate-800/60"}`}>
+                      <input type="checkbox" checked={col.set.has(x.p.id) && !isLocked} disabled={isLocked} aria-label={`Include ${x.p.name}`}
+                        onChange={() => toggle(col.set, x.p.id, col.fn)} className="accent-emerald-500 disabled:cursor-not-allowed" />
+                      <PosBadge pos={x.p.pos} />
+                      <span className="flex-1 truncate text-slate-200">{x.p.name}{isLocked && <span className="ml-1.5 text-[10px] font-semibold text-amber-300">can&apos;t be traded</span>}</span>
+                      <span className="text-xs tabular-nums text-slate-500">{fmt(x.v, 0)}</span>
+                      {league && (
+                        <button type="button" onClick={() => { col.fn(new Set([...col.set].filter((id) => id !== x.p.id))); onLeagueEdit(toggleLock(league, x.p.id)); }}
+                          title={isLocked ? "Locked: can't be traded (e.g. on a 1-week trade). Click to unlock." : "Lock: mark as can't be traded (e.g. on a 1-week trade)"}
+                          aria-label={isLocked ? `Unlock ${x.p.name}` : `Lock ${x.p.name}`}
+                          className={`rounded p-1 ${isLocked ? "text-amber-300 hover:bg-amber-500/10" : "text-slate-600 hover:bg-slate-800 hover:text-slate-300"}`}>
+                          {isLocked ? <IconLock className="h-3.5 w-3.5" /> : <IconUnlock className="h-3.5 w-3.5" />}
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           ))}
         </div>
+        <p className="mt-2 flex items-center gap-1.5 text-[11px] text-slate-500">
+          <IconLock className="h-3 w-3" /> Lock a player who can&apos;t be traded right now (for example he&apos;s on a 1-week trade). Locked players still count in lineups but are never suggested.
+        </p>
         {custom && (
           <div className="mt-4 grid gap-3 rounded-lg bg-slate-950/60 p-3 sm:grid-cols-3">
             <div><div className="text-[11px] text-slate-500">Your starting lineup</div><div className={`text-lg font-bold tabular-nums ${custom.myGain >= 0 ? "text-emerald-300" : "text-rose-300"}`}>{custom.myGain >= 0 ? "+" : ""}{fmt(custom.myGain, 0)} pts</div></div>

@@ -153,8 +153,9 @@ export interface Partner {
 
 /** Search 1-for-1, 2-for-1, 1-for-2 and 2-for-2 trades with every partner; keep ones that help you and that
  *  they'd plausibly accept. */
-export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfig, opts = { perPartner: 2, total: 12 }): TradeEval[] {
-  const top = (r: Valued[], n: number) => [...r].sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.p);
+export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfig, opts = { perPartner: 2, total: 12 }, locked: Set<string> = new Set()): TradeEval[] {
+  // Locked players (e.g. on a 1-week trade) still count in lineups but are never offered or asked for
+  const top = (r: Valued[], n: number) => [...r].filter((x) => !locked.has(x.p.id)).sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.p);
   const myCands = top(mine, 8);
   const myBefore = lineupValue(mine, cfg).total;
   const out: TradeEval[] = [];
@@ -221,8 +222,9 @@ const ids = (ps: RankedPlayer[]) => ps.map((p) => p.id).sort().join(",");
  * top players for the target alone or the target plus one of theirs. Ranked by the chance they say yes and how
  * little it costs your lineup. If nothing is realistic, the closest long shots come back so you see the gap.
  */
-export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Partner, cfg: LeagueConfig, limit = 4): TradeEval[] {
-  const top = (r: Valued[], n: number) => [...r].sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.p);
+export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Partner, cfg: LeagueConfig, limit = 4, locked: Set<string> = new Set()): TradeEval[] {
+  if (locked.has(target.id)) return [];
+  const top = (r: Valued[], n: number) => [...r].filter((x) => !locked.has(x.p.id)).sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.p);
   const myCands = top(mine, 10);
   const extras = top(partner.roster.filter((x) => x.p.id !== target.id), 6);
   const gets: RankedPlayer[][] = [[target], ...extras.map((p) => [target, p])];
@@ -241,11 +243,12 @@ export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Par
 }
 
 /** "Shop my player": the best realistic return for `player` from every other team. */
-export function shopPlayer(player: RankedPlayer, mine: Valued[], partners: Partner[], cfg: LeagueConfig, limit = 4): TradeEval[] {
+export function shopPlayer(player: RankedPlayer, mine: Valued[], partners: Partner[], cfg: LeagueConfig, limit = 4, locked: Set<string> = new Set()): TradeEval[] {
+  if (locked.has(player.id)) return [];
   const myBefore = lineupValue(mine, cfg).total;
   const out: TradeEval[] = [];
   for (const partner of partners) {
-    const theirs = [...partner.roster].sort((a, b) => b.v - a.v).slice(0, 8).map((x) => x.p);
+    const theirs = [...partner.roster].filter((x) => !locked.has(x.p.id)).sort((a, b) => b.v - a.v).slice(0, 8).map((x) => x.p);
     const before = { mine: myBefore, theirs: lineupValue(partner.roster, cfg).total };
     let best: TradeEval | null = null;
     for (const get of [...combos(theirs, 1), ...combos(theirs, 2)]) {

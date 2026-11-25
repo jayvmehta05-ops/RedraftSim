@@ -51,3 +51,15 @@ export function keeperOn(league: ImportedLeague | null, siteSetting: boolean): b
   if (league.rules?.keeper != null) return league.rules.keeper;
   return league.kind === "keeper" || league.kind === "dynasty";
 }
+
+/** Players that can't be traded right now (e.g. on a 1-week trade). */
+export function lockedSet(league: ImportedLeague | null): Set<string> {
+  return new Set(league?.rules?.locked ?? []);
+}
+
+/** The league with `id` locked or unlocked. */
+export function toggleLock(league: ImportedLeague, id: string): ImportedLeague {
+  const s = lockedSet(league);
+  if (s.has(id)) s.delete(id); else s.add(id);
+  return { ...league, rules: { ...league.rules, locked: [...s] } };
+}

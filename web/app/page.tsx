@@ -2,11 +2,15 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import AccountButton from "@/components/AccountButton";
 import ContinueButton from "@/components/ContinueButton";
-import { IconBoard, IconKeeper, IconLive, IconMock, IconSwap, IconTrend, Logo } from "@/components/icons";
-import { PosBadge, thumb } from "@/components/ui";
+import { Logo } from "@/components/icons";
+import Counters from "@/components/landing/Counters";
+import FeatureTour from "@/components/landing/FeatureTour";
+import HeroHeadline from "@/components/landing/HeroHeadline";
+import TopCard, { type TopRow } from "@/components/landing/TopCard";
+import { thumb } from "@/components/ui";
 import boardJson from "@/data/board.json";
 import { SITE_NAME, SOURCE, TARGET } from "@/lib/season";
-import type { BoardData } from "@/lib/types";
+import type { BoardData, Pos, RawPlayer } from "@/lib/types";
 
 const board = boardJson as unknown as BoardData;
 
@@ -15,130 +19,135 @@ export const metadata: Metadata = {
   description: `Next season's fantasy football board today, re-ranked for your league's exact rules. Mock drafts against bots that draft like your leaguemates, plus trade, waiver and luck tools for ${SOURCE}.`,
 };
 
-const FEATURES = [
-  { icon: IconBoard, title: `${TARGET} Big Board`, body: "Every player projected for next season and ranked by value over replacement, rebuilt every Tuesday from this season's games." },
-  { icon: IconMock, title: "Mock drafts that feel real", body: "Bots learn how each of your leaguemates actually drafts. Describe them in plain words if they're new." },
-  { icon: IconLive, title: "Live draft assistant", body: "Follow your real draft pick by pick, with the odds each player is still there at your next turn." },
-  { icon: IconSwap, title: "My League", body: "Your best lineup, trades the other manager would actually accept, waiver pickups ranked for your roster, and power rankings." },
-  { icon: IconKeeper, title: "Luck meter", body: "Your all-play record and how many wins schedule luck gave or took, for every team in your league." },
-  { icon: IconTrend, title: "Trends", body: "Risers and fallers week to week, so you see value shifts before your league does." },
-];
-
 const STEPS = [
   { n: "1", title: "Bring your league", body: "Import from Sleeper or ESPN (private leagues too) or set it up by hand. No account needed." },
   { n: "2", title: "Everything re-ranks", body: "Scoring, roster slots and team count flow into every projection, ranking and suggestion." },
   { n: "3", title: "Plan your moves", body: "Mock your draft, find trades and work the waiver wire with numbers built for your league." },
 ];
 
+const FAQ = [
+  ["Is this for redraft or dynasty?", "Redraft first. In-season tools (rosters, trades, waivers) look at the rest of this season only. Keeper leagues can switch League type to Keeper in settings. Dynasty isn't modeled yet."],
+  ["Why a board for next season already?", `Because the best time to plan is before everyone else does. The ${TARGET} board updates every Tuesday from this season's games, so you can watch values move all year.`],
+  ["Are the projections guaranteed?", "No. They're model estimates from public data and they will miss sometimes. How they've done on past seasons is published on the Accuracy page, good and bad."],
+  ["How current are my league's rosters?", "They refresh from Sleeper or ESPN every 10 minutes while you're using My League, and there's a Refresh now button. A trade stuck in your platform's review period appears once it goes through."],
+  ["Why does it ask for my ESPN cookies?", "Only for private ESPN leagues, which ESPN won't share without your login. The cookies stay on your device and are never stored on our servers or in your account."],
+  ["What isn't covered?", "Kickers and defenses aren't projected, and some bonus scoring rules aren't modeled. The app tells you which of your league's rules it approximates."],
+  ["Does it cost anything?", "No. Free, no ads, no gambling. Sign in with Google only if you want your leagues on every device."],
+];
+
+function toRow(p: RawPlayer): TopRow {
+  return { id: p.id, name: p.name, team: p.team, pos: p.pos, posRank: p.posRank, ppg: p.ppg, img: thumb(p.headshot, 64) };
+}
+
 export default function Landing() {
-  const top = [...board.players].sort((a, b) => a.rank - b.rank).slice(0, 5);
+  const players = [...board.players].sort((a, b) => a.rank - b.rank);
+  const pick = (pos?: Pos) => players.filter((p) => !pos || p.pos === pos).slice(0, 5).map(toRow);
+  const lists = { ALL: pick(), QB: pick("QB"), RB: pick("RB"), WR: pick("WR"), TE: pick("TE") };
   const m = board.meta;
   const updated = m.lastIngest
     ? new Date(m.lastIngest).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" })
     : null;
+  // This week's biggest movers among relevant players, for the ticker
+  const relevant = players.filter((p) => p.rank <= 200 && p.rankDelta != null && Math.abs(p.rankDelta) >= 3);
+  const risers = [...relevant].sort((a, b) => (b.rankDelta ?? 0) - (a.rankDelta ?? 0)).slice(0, 8);
+  const fallers = [...relevant].sort((a, b) => (a.rankDelta ?? 0) - (b.rankDelta ?? 0)).slice(0, 8);
+  const ticker = risers.flatMap((r, i) => [r, fallers[i]].filter(Boolean));
+  const names = players.slice(0, 20).map((p) => p.name);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
+    <div className="min-h-screen overflow-x-hidden bg-slate-950 text-slate-200">
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <Link href="/" className="flex items-center gap-2.5">
-            <Logo className="h-8 w-8" />
-            <span className="whitespace-nowrap text-sm font-bold text-white sm:text-base">{SITE_NAME}</span>
+          <Link href="/" className="group flex items-center gap-2.5">
+            <Logo className="h-8 w-8 transition group-hover:rotate-[-8deg] group-hover:scale-110" />
+            <span className="whitespace-nowrap text-sm font-bold text-white sm:text-base">Future <span className="text-emerald-400">Fantasy</span></span>
           </Link>
           <nav className="ml-auto hidden items-center gap-1 text-sm font-semibold md:flex">
-            <Link href="/guide" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">How it works</Link>
+            <a href="#tour" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">Features</a>
             <Link href="/accuracy" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">Accuracy</Link>
-            <Link href="/about" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">About</Link>
+            <a href="#faq" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">FAQ</a>
           </nav>
           <div className="ml-auto flex items-center gap-2 md:ml-2">
             <AccountButton />
-            <Link href="/app" className="whitespace-nowrap rounded-lg bg-emerald-500 px-3 py-2 text-sm font-bold text-slate-950 hover:bg-emerald-400">Open app</Link>
+            <Link href="/app" className="relative overflow-hidden whitespace-nowrap rounded-lg bg-emerald-500 px-3 py-2 text-sm font-bold text-slate-950 hover:bg-emerald-400">
+              <span aria-hidden className="ff-shimmer absolute inset-0" />
+              <span className="relative">Open app</span>
+            </Link>
           </div>
         </div>
       </header>
 
       <main>
         {/* Hero */}
-        <section className="relative overflow-hidden">
-          <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top_left,rgba(16,185,129,0.16),transparent_55%)]" />
-          <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pt-14 pb-16 md:grid-cols-[1.15fr_1fr] md:pt-20 md:pb-24">
+        <section className="relative">
+          <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+            <div className="ff-grid absolute inset-0" />
+            <div className="ff-float absolute -top-32 -left-24 h-96 w-96 rounded-full bg-emerald-500/20 blur-3xl" />
+            <div className="ff-float-2 absolute top-10 right-0 h-80 w-80 rounded-full bg-cyan-500/15 blur-3xl" />
+            <div className="ff-float absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-fuchsia-500/10 blur-3xl" style={{ animationDelay: "-6s" }} />
+          </div>
+          <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pt-14 pb-14 md:grid-cols-[1.15fr_1fr] md:pt-20 md:pb-20">
             <div>
               {updated && (
                 <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/30">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                  Updated {updated} · through {m.sourceSeason} Week {m.throughWeek}
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                  </span>
+                  Live · updated {updated} · through {m.sourceSeason} Week {m.throughWeek}
                 </div>
               )}
-              <h1 className="mt-5 text-4xl font-black leading-[1.05] tracking-tight text-white sm:text-5xl md:text-6xl">
-                Your league&apos;s <span className="text-emerald-400">{TARGET}</span> board, <br className="hidden sm:block" />built today.
-              </h1>
-              <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-400 sm:text-lg">
-                Next-season fantasy football projections tuned to your exact scoring and roster, mock drafts against bots that draft like
-                your leaguemates, and the trade and waiver tools to win {SOURCE} along the way.
-              </p>
-              <div className="mt-8 flex flex-wrap items-center gap-3">
+              <HeroHeadline target={TARGET} source={SOURCE} />
+              <div className="mt-6 flex flex-wrap items-center gap-3">
                 <ContinueButton newLabel={`See the ${TARGET} board`}
-                  className="inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-500/20 hover:bg-emerald-400" />
-                <Link href="/guide" className="rounded-xl px-5 py-3 text-sm font-semibold text-slate-300 ring-1 ring-slate-700 hover:bg-slate-900 hover:text-white">
-                  How it works
-                </Link>
+                  className="ff-glow relative inline-flex items-center gap-1 overflow-hidden rounded-xl bg-emerald-500 px-5 py-3 text-sm font-bold text-slate-950 transition hover:scale-[1.03] hover:bg-emerald-400" />
+                <a href="#tour" className="rounded-xl px-5 py-3 text-sm font-semibold text-slate-300 ring-1 ring-slate-700 transition hover:bg-slate-900 hover:text-white">
+                  Take the tour ↓
+                </a>
               </div>
-              <p className="mt-4 text-xs text-slate-500">Free. No account needed. Sign in only if you want your leagues on every device.</p>
+              <p className="mt-4 text-xs text-slate-500">Free. No ads. No account needed. Sign in only to sync your leagues across devices.</p>
             </div>
-
-            {/* Live preview from the real board */}
-            <div className="rounded-2xl bg-slate-900/80 p-4 shadow-2xl ring-1 ring-slate-800">
-              <div className="flex items-center justify-between px-1 pb-3">
-                <div className="text-sm font-bold text-white">Top 5 for {TARGET}</div>
-                <div className="text-[11px] text-slate-500">12-team full PPR</div>
-              </div>
-              <ol className="space-y-1.5">
-                {top.map((p) => {
-                  const img = thumb(p.headshot, 64);
-                  return (
-                    <li key={p.id} className="flex items-center gap-3 rounded-xl bg-slate-950/70 px-3 py-2.5 ring-1 ring-slate-800/80">
-                      <span className="w-5 text-center text-sm font-black tabular-nums text-slate-500">{p.rank}</span>
-                      {img ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={img} alt="" className="h-9 w-9 rounded-full bg-slate-800 object-cover" />
-                      ) : (
-                        <span className="h-9 w-9 rounded-full bg-slate-800" />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-white">{p.name}</div>
-                        <div className="text-[11px] text-slate-500">{p.team}</div>
-                      </div>
-                      <PosBadge pos={p.pos} rank={p.posRank} />
-                      <div className="w-14 text-right">
-                        <div className="text-sm font-bold tabular-nums text-white">{p.ppg.toFixed(1)}</div>
-                        <div className="text-[10px] text-slate-500">PPG</div>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ol>
-              <Link href="/app" className="mt-3 block rounded-xl py-2 text-center text-xs font-semibold text-emerald-300 hover:bg-slate-800">
-                See the full board →
-              </Link>
-            </div>
+            <TopCard lists={lists} target={TARGET} />
           </div>
         </section>
 
-        {/* Features */}
-        <section className="border-t border-slate-800/70 bg-slate-950">
+        {/* Movers ticker */}
+        {ticker.length > 0 && (
+          <section aria-label="This week's biggest movers" className="ff-marquee-wrap relative overflow-hidden border-y border-slate-800/70 bg-slate-900/40 py-3">
+            <div aria-hidden className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-slate-950 to-transparent" />
+            <div aria-hidden className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-slate-950 to-transparent" />
+            <div className="ff-marquee flex w-max gap-8 whitespace-nowrap text-sm">
+              {[...ticker, ...ticker].map((p, i) => {
+                const up = (p.rankDelta ?? 0) > 0;
+                return (
+                  <Link key={`${p.id}-${i}`} href="/risers" className="flex items-center gap-2 text-slate-300 hover:text-white">
+                    <span className={`font-bold ${up ? "text-emerald-400" : "text-rose-400"}`}>{up ? "▲" : "▼"} {Math.abs(p.rankDelta ?? 0)}</span>
+                    <span className="font-semibold">{p.name}</span>
+                    <span className="text-xs text-slate-500">{p.pos} · now #{p.rank}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Counters */}
+        <section className="mx-auto max-w-6xl px-4 pt-14">
+          <Counters items={[
+            { value: board.players.length, label: `players projected for ${TARGET}` },
+            { value: m.throughWeek, label: `weeks of ${SOURCE} games in the model` },
+            { value: 10, suffix: " min", label: "league roster refresh" },
+            { value: 0, prefix: "$", label: "to use. No ads, no gambling" },
+          ]} />
+        </section>
+
+        {/* Feature tour */}
+        <section id="tour" className="scroll-mt-20">
           <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Everything for your league, in one place</h2>
-            <p className="mt-2 max-w-2xl text-slate-400">Most sites wake up for next season in August. This one keeps your plan current all year.</p>
-            <div className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {FEATURES.map(({ icon: Icon, title, body }) => (
-                <div key={title} className="rounded-2xl bg-slate-900/70 p-5 ring-1 ring-slate-800">
-                  <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30">
-                    <Icon className="h-5 w-5" />
-                  </span>
-                  <h3 className="mt-4 font-semibold text-white">{title}</h3>
-                  <p className="mt-1.5 text-sm leading-relaxed text-slate-400">{body}</p>
-                </div>
-              ))}
+            <p className="mt-2 max-w-2xl text-slate-400">Most sites wake up for next season in August. This one keeps your plan current all year. Click around:</p>
+            <div className="mt-10">
+              <FeatureTour names={names} target={TARGET} source={SOURCE} />
             </div>
           </div>
         </section>
@@ -147,10 +156,14 @@ export default function Landing() {
         <section className="border-t border-slate-800/70">
           <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
             <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Three steps to your league&apos;s board</h2>
-            <div className="mt-10 grid gap-6 md:grid-cols-3">
+            <div className="relative mt-10 grid gap-6 md:grid-cols-3">
+              <div aria-hidden className="absolute top-[18px] right-[16%] left-[16%] hidden h-px bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0 md:block" />
               {STEPS.map((s) => (
-                <div key={s.n} className="flex gap-4">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-black text-slate-950">{s.n}</span>
+                <div key={s.n} className="group relative flex gap-4 md:flex-col md:items-center md:text-center">
+                  <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-black text-slate-950 transition group-hover:scale-110">
+                    <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-emerald-400/40 [animation-duration:2.4s]" />
+                    <span className="relative">{s.n}</span>
+                  </span>
                   <div>
                     <h3 className="font-semibold text-white">{s.title}</h3>
                     <p className="mt-1 text-sm leading-relaxed text-slate-400">{s.body}</p>
@@ -164,7 +177,7 @@ export default function Landing() {
                 ["Not gambling", "A planning tool for season-long leagues. No bets, no odds.", "/terms"],
                 ["Your data stays yours", "Each account sees only its own leagues. ESPN logins never leave your device.", "/privacy"],
               ].map(([t, b, href]) => (
-                <Link key={t} href={href} className="rounded-xl bg-slate-900/50 p-4 ring-1 ring-slate-800 hover:ring-slate-700">
+                <Link key={t} href={href} className="rounded-xl bg-slate-900/50 p-4 ring-1 ring-slate-800 transition hover:-translate-y-0.5 hover:ring-emerald-500/40">
                   <div className="text-sm font-semibold text-white">{t}</div>
                   <div className="mt-1 text-xs leading-relaxed text-slate-400">{b}</div>
                 </Link>
@@ -173,13 +186,32 @@ export default function Landing() {
           </div>
         </section>
 
+        {/* Good to know */}
+        <section id="faq" className="scroll-mt-20 border-t border-slate-800/70">
+          <div className="mx-auto max-w-3xl px-4 py-16 md:py-20">
+            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Good to know</h2>
+            <div className="mt-8 space-y-2">
+              {FAQ.map(([q, a]) => (
+                <details key={q} className="group rounded-xl bg-slate-900/60 ring-1 ring-slate-800 open:ring-emerald-500/30">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 font-semibold text-white">
+                    <span className="flex-1">{q}</span>
+                    <span aria-hidden className="text-emerald-400 transition group-open:rotate-45">+</span>
+                  </summary>
+                  <p className="px-4 pb-4 text-sm leading-relaxed text-slate-400">{a}</p>
+                </details>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* Final call to action */}
-        <section className="border-t border-slate-800/70">
-          <div className="mx-auto max-w-6xl px-4 py-16 text-center">
-            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Get a head start on {TARGET}</h2>
-            <p className="mx-auto mt-2 max-w-lg text-slate-400">Import your league in under a minute and see where your team stands.</p>
+        <section className="relative overflow-hidden border-t border-slate-800/70">
+          <div aria-hidden className="ff-float pointer-events-none absolute top-0 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-3xl" />
+          <div className="relative mx-auto max-w-6xl px-4 py-20 text-center">
+            <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Get a head start on {TARGET}</h2>
+            <p className="mx-auto mt-3 max-w-lg text-slate-400">Import your league in under a minute and see where your team stands.</p>
             <ContinueButton newLabel="Open the app"
-              className="mt-6 inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-6 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400" />
+              className="ff-glow mt-8 inline-flex items-center gap-1 rounded-xl bg-emerald-500 px-7 py-3.5 text-base font-bold text-slate-950 transition hover:scale-[1.03] hover:bg-emerald-400" />
           </div>
         </section>
       </main>

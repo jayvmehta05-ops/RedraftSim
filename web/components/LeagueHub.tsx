@@ -51,6 +51,8 @@ export default function LeagueHub(props: {
   board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague | null; myManager: string | null;
   leaguemates: LeaguemateProfile[]; weeksLeft: number; keeper: boolean; onOpenSettings: () => void;
   onLeagueRefreshed: (l: ImportedLeague) => void; onChooseManager: (id: string | null) => void; onOpenEditor: () => void;
+  /** save a hand edit to the league (e.g. locking a player) */
+  onLeagueEdit: (l: ImportedLeague) => void;
 }) {
   const [section, setSection] = useState<Section>("team");
   const { league, myManager, onLeagueRefreshed } = props;
@@ -153,7 +155,7 @@ export default function LeagueHub(props: {
       )}
       {!offseason && section === "team" && !blocked && league && myManager && (
         <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} leaguemates={props.leaguemates}
-          weeksLeft={props.weeksLeft} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} />
+          weeksLeft={props.weeksLeft} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} onLeagueEdit={props.onLeagueEdit} />
       )}
       {!offseason && section === "waivers" && !blocked && league && myManager && (
         <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} keeper={props.keeper} />

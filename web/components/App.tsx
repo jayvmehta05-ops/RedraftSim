@@ -279,7 +279,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         {tab === "trades" && (
           <LeagueHub board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
             weeksLeft={Math.max(0, 17 - m.throughWeek)} keeper={keeper} onOpenSettings={() => setSettingsOpen(true)}
-            onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} onOpenEditor={() => setEditorOpen(true)} />
+            onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} onOpenEditor={() => setEditorOpen(true)} onLeagueEdit={editLeague} />
         )}
         {tab === "keepers" && keeper && <KeeperCalc board={board} cfg={cfg} />}
         {tab === "trends" && <TrendTracker board={board} trends={trends} throughWeek={m.throughWeek} />}

@@ -28,3 +28,5 @@ export function Logo({ className = "h-8 w-8" }: P) {
     </svg>
   );
 }
+export const IconLock = ({ className }: P) => svg(<><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></>, className);
+export const IconUnlock = ({ className }: P) => svg(<><rect x="5" y="11" width="14" height="10" rx="2" /><path d="M8 11V7a4 4 0 0 1 7.5-2" /></>, className);
