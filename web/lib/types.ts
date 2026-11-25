@@ -194,6 +194,8 @@ export interface ImportedLeague {
      *  managerId (null for a bye / median week). Used by the luck meter. */
     weekly?: number[];
     opponents?: (string | null)[];
+    /** player ids (same id type as playerIds) the manager has in their starting lineup on the platform right now */
+    starters?: string[];
   }[];
   fetchedAt?: string;
   /** League rules the user sets by hand (kept across refreshes) */

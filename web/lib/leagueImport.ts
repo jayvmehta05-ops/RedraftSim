@@ -144,7 +144,7 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
     `https://api.sleeper.app/v1/league/${lg.league_id}/users`).catch(() => []);
   const managers = users.map((u) => ({ id: u.user_id, name: u.display_name }));
   const sleeperRosters = await getJson<{
-    roster_id: number; owner_id: string | null; players: string[] | null;
+    roster_id: number; owner_id: string | null; players: string[] | null; starters?: string[] | null;
     settings?: { wins?: number; losses?: number; ties?: number; fpts?: number; fpts_decimal?: number; waiver_budget_used?: number };
   }[]>(
     `https://api.sleeper.app/v1/league/${lg.league_id}/rosters`).catch(() => []);
@@ -154,6 +154,7 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
     .filter((r) => r.owner_id)
     .map((r) => ({
       managerId: String(r.owner_id), playerIds: (r.players ?? []).map(String), idType: "sleeper" as const,
+      starters: (r.starters ?? []).filter((id) => id && id !== "0").map(String),
       ...weekly.get(String(r.owner_id)),
       record: {
         wins: r.settings?.wins ?? 0, losses: r.settings?.losses ?? 0, ties: r.settings?.ties ?? 0,
@@ -207,7 +208,7 @@ interface EspnLeague {
   };
   teams?: {
     id: number; name?: string; location?: string; nickname?: string; owners?: string[];
-    roster?: { entries?: { playerId: number }[] };
+    roster?: { entries?: { playerId: number; lineupSlotId?: number }[] };
     record?: { overall?: { wins?: number; losses?: number; ties?: number; pointsFor?: number } };
     transactionCounter?: { acquisitionBudgetSpent?: number };
   }[];
@@ -308,6 +309,8 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
   return {
     rosters: (lg.teams ?? []).map((t) => ({
       managerId: String(t.id), playerIds: (t.roster?.entries ?? []).map((e) => String(e.playerId)), idType: "espn" as const,
+      // lineup slot 20 = bench, 21 = IR; everything else is a starting slot
+      starters: (t.roster?.entries ?? []).filter((e) => e.lineupSlotId != null && e.lineupSlotId !== 20 && e.lineupSlotId !== 21).map((e) => String(e.playerId)),
       ...weekly.get(String(t.id)),
       record: {
         wins: t.record?.overall?.wins ?? 0, losses: t.record?.overall?.losses ?? 0, ties: t.record?.overall?.ties ?? 0,

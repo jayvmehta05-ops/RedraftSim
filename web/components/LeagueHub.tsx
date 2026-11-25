@@ -7,11 +7,12 @@ import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import LuckMeter from "./LuckMeter";
 import MyTeam from "./MyTeam";
+import StartSit from "./StartSit";
 import PowerRankings from "./PowerRankings";
 import TradeAssistant from "./TradeAssistant";
 import Waivers from "./Waivers";
 
-type Section = "team" | "trades" | "waivers" | "power" | "luck";
+type Section = "team" | "startsit" | "trades" | "waivers" | "power" | "luck";
 
 /** Shown when ESPN needs fresh login cookies for a private league; retries the refresh on submit. */
 function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember: boolean) => void; busy: boolean; error: string | null }) {
@@ -110,6 +111,7 @@ export default function LeagueHub(props: {
   const ready = !!league?.rosters?.some((r) => r.playerIds.length || (r.manualIds ?? []).length);
   const sections: { id: Section; label: string; needsMe: boolean }[] = [
     { id: "team", label: "Rosters", needsMe: true },
+    { id: "startsit", label: "Start/Sit", needsMe: true },
     { id: "trades", label: "Trades", needsMe: true },
     { id: "waivers", label: "Waivers", needsMe: true },
     { id: "power", label: "Power rankings", needsMe: false },
@@ -156,6 +158,9 @@ export default function LeagueHub(props: {
       {!offseason && section === "team" && !blocked && league && myManager && (
         <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} leaguemates={props.leaguemates}
           weeksLeft={props.weeksLeft} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} onLeagueEdit={props.onLeagueEdit} />
+      )}
+      {!offseason && section === "startsit" && !blocked && league && myManager && (
+        <StartSit board={props.board} cfg={props.cfg} league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />
       )}
       {!offseason && section === "waivers" && !blocked && league && myManager && (
         <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} keeper={props.keeper} />
