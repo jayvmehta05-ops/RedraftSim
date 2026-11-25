@@ -444,17 +444,29 @@ def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: p
     return out.drop(columns=["team_norm", "last_team_norm"])
 
 
+TIER_PICK = {1: 5, 2: 21, 3: 48, 4: 85, 5: 170}  # typical pick for each draft-capital tier
+
+
 def build_rookie_projections(con, target: int = 2027) -> pd.DataFrame:
+    """Incoming rookies. Uses the draft-history curve (data/rookie_curve.json, scripts/rookie_model.py) by
+    projected pick when available, else the hand-made tier templates."""
+    from rookie_model import CURVE_PATH, project as curve_project
+    curve = json.loads(CURVE_PATH.read_text(encoding="utf-8"))["curve"] if CURVE_PATH.exists() else None
     rk = pd.read_sql_query("SELECT * FROM rookies", con)
     rows = []
     for _, r in rk.iterrows():
         pos, tier = r["position"], int(min(max(r["draft_capital_tier"], 1), 5))
-        tpl = ROOKIE_TEMPLATES[pos][tier]
         grade = float(r["talent_grade"] or 1.0)
         comp = {c: 0.0 for c in STAT_COMPONENTS}
-        for k, v in tpl.items():
-            # talent grade scales volume and efficiency (counting stats)
-            comp[k] = v * (grade if k not in ("pass_att", "pass_int", "fum_lost") else 1.0)
+        pick = r["projected_pick"] if pd.notna(r["projected_pick"]) else TIER_PICK[tier]
+        if curve:
+            pg, curve_games = curve_project(curve, pos, float(pick), grade)
+            comp.update(pg)
+        else:
+            curve_games = None
+            for k, v in ROOKIE_TEMPLATES[pos][tier].items():
+                # talent grade scales volume and efficiency (counting stats)
+                comp[k] = v * (grade if k not in ("pass_att", "pass_int", "fum_lost") else 1.0)
         notes = [f"{target} rookie — draft capital tier {tier} (proj. pick {r['projected_pick'] or '?'})"]
         if grade != 1.0:
             notes.append(f"Talent grade x{grade:.2f}")
@@ -465,7 +477,8 @@ def build_rookie_projections(con, target: int = 2027) -> pd.DataFrame:
             "injury_status": None, "injury_body_part": None, "games_2026": 0, "games_2025": 0,
             "target_share_2026": None, "touch_share_2026": None,
             "stats_2026": {c: 0.0 for c in STAT_COMPONENTS},
-            "proj_games": ROOKIE_GAMES[pos][tier] * (0.97 if not r["landing_team"] else 1.0),
+            "proj_games": (curve_games if curve_games is not None else ROOKIE_GAMES[pos][tier])
+                          * (0.97 if not r["landing_team"] else 1.0),
             "proj": {k: round(v, 4) for k, v in comp.items()}, "search_rank": None,
             "espn_adp": None, "espn_owned": None, "espn_ros": None,
             "adp_override": None if pd.isna(r["adp_override"]) else float(r["adp_override"]),

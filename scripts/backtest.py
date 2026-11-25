@@ -33,6 +33,7 @@ from common import (  # noqa: E402
     points_per_game, season_start,
 )
 from project_2027 import build_veteran_projections, clean_json, replacement_levels  # noqa: E402
+from rookie_model import DRAFT_PICKS, FIRST_SEASON, fit_curve, project as curve_project, rookie_seasons  # noqa: E402
 from update_data import (  # noqa: E402
     ESPN_PLAYERS, ESPN_POS, ESPN_STAT_IDS, HEADERS, ID_MAP_URL, SLEEPER, attach_player_ids,
     fetch_nflverse_weekly, get_csv, get_json,
@@ -238,10 +239,38 @@ def run_target(target: int, cfg: dict, players: pd.DataFrame, espn_to_sleeper: d
     missing_model = int(df["model_points"].isna().sum())
     df["model_points"] = df["model_points"].fillna(0.0)  # no usable history -> projected as a non-factor
 
+    # Rookies: draft-history curve fit only on drafts before `target` (no peeking at their outcomes)
+    curve = fit_curve(rookie_seasons(FIRST_SEASON, target - 1), sc)
+    dp = get_csv(DRAFT_PICKS)
+    dp = dp[(dp["season"] == target) & dp["position"].isin(FANTASY_POSITIONS)]
+    by_gsis = players.dropna(subset=["gsis_id"]).drop_duplicates("gsis_id").set_index("gsis_id")["player_id"]
+    pick_of = {by_gsis.get(g): int(p) for g, p in zip(dp["gsis_id"], dp["pick"]) if by_gsis.get(g)}
+    rk = espn[espn["espn_rank"].notna()].nsmallest(POOL_SIZE, "espn_rank").reindex(rookies).dropna(subset=["position"])
+    rdf = pd.DataFrame(index=rk.index)
+    rdf["name"] = pl["name"].reindex(rdf.index).fillna(rk["espn_name"])
+    rdf["position"] = rk["position"]
+    rdf["espn_rank"] = rk["espn_rank"]
+    rdf["espn_points"] = rk["espn_points"]
+    rdf["model_points"] = [
+        (lambda pg_g: points_per_game(pg_g[0], pos, sc) * pg_g[1])(curve_project(curve, pos, pick_of.get(pid, 262)))
+        for pid, pos in zip(rdf.index, rdf["position"])]
+    rdf["naive_points"] = 0.0
+    rdf["actual_points"] = actual["points"].reindex(rdf.index).fillna(0.0)
+    rdf["actual_games"] = actual["games"].reindex(rdf.index).fillna(0).astype(int)
+    all_df = pd.concat([df, rdf])
+
     res = evaluate(df, cfg)
+    res_all = evaluate(all_df, cfg)
+    rookie_corr = {
+        "n": int(len(rdf)),
+        "model": round(spearman(rdf["model_points"], rdf["actual_points"]), 3) if len(rdf) > 4 else None,
+        "espn": round(spearman(rdf["espn_points"].fillna(0), rdf["actual_points"]), 3) if len(rdf) > 4 else None,
+        "espn_rank": round(spearman(-rdf["espn_rank"], rdf["actual_points"]), 3) if len(rdf) > 4 else None,
+    }
     log(f"{target}: pool {len(df)} veterans ({len(rookies)} rookies excluded, {missing_model} without model history)")
     return {"target": target, "data_seasons": [target - 2, target - 1], "pool": len(df),
-            "rookies_excluded": len(rookies), "metrics": res, "misses": biggest_misses(df)}
+            "rookies_excluded": len(rookies), "metrics": res, "metrics_with_rookies": res_all,
+            "rookies": rookie_corr, "misses": biggest_misses(df)}
 
 
 def main() -> None:
@@ -273,6 +302,10 @@ def main() -> None:
             print(f"{m:<10}{x['spearman_points']:>10}{x['spearman_vorp']:>10}{str(x['mae_points']):>9}   "
                   f"{x['top_n_hit_rate']}")
         print("by position (rank corr):", {m: r["metrics"][m]["spearman_by_pos"] for m in ("model", "espn")})
+        print("with rookies (rank corr / VORP corr):",
+              {m: (r["metrics_with_rookies"][m]["spearman_points"], r["metrics_with_rookies"][m]["spearman_vorp"])
+               for m in ("model", "espn", "espn_rank")})
+        print("rookies only:", r["rookies"])
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-25T16:39:44+00:00",
+ "generatedAt": "2026-11-25T16:42:44+00:00",
  "poolDefinition": "ESPN preseason PPR top 200, veterans only",
  "scoring": "league_settings.json defaults",
  "results": [
@@ -84,6 +84,86 @@
       "TE": 0.583
      }
     }
+   },
+   "metrics_with_rookies": {
+    "model": {
+     "n": 200,
+     "spearman_points": 0.502,
+     "mae_points": 62.5,
+     "spearman_vorp": 0.477,
+     "spearman_by_pos": {
+      "QB": 0.1,
+      "RB": 0.562,
+      "TE": 0.106,
+      "WR": 0.421
+     },
+     "top_n_hit_rate": {
+      "QB": 0.583,
+      "RB": 0.75,
+      "WR": 0.417,
+      "TE": 0.417
+     }
+    },
+    "espn": {
+     "n": 198,
+     "spearman_points": 0.645,
+     "mae_points": 55.3,
+     "spearman_vorp": 0.591,
+     "spearman_by_pos": {
+      "QB": 0.349,
+      "RB": 0.668,
+      "TE": 0.149,
+      "WR": 0.577
+     },
+     "top_n_hit_rate": {
+      "QB": 0.667,
+      "RB": 0.708,
+      "WR": 0.542,
+      "TE": 0.583
+     }
+    },
+    "naive": {
+     "n": 200,
+     "spearman_points": 0.378,
+     "mae_points": 79.5,
+     "spearman_vorp": 0.367,
+     "spearman_by_pos": {
+      "QB": 0.074,
+      "RB": 0.54,
+      "TE": -0.044,
+      "WR": 0.347
+     },
+     "top_n_hit_rate": {
+      "QB": 0.5,
+      "RB": 0.667,
+      "WR": 0.458,
+      "TE": 0.417
+     }
+    },
+    "espn_rank": {
+     "n": 200,
+     "spearman_points": 0.563,
+     "mae_points": null,
+     "spearman_vorp": 0.574,
+     "spearman_by_pos": {
+      "QB": 0.306,
+      "RB": 0.715,
+      "TE": 0.111,
+      "WR": 0.655
+     },
+     "top_n_hit_rate": {
+      "QB": 0.667,
+      "RB": 0.75,
+      "WR": 0.583,
+      "TE": 0.583
+     }
+    }
+   },
+   "rookies": {
+    "n": 21,
+    "model": 0.407,
+    "espn": 0.616,
+    "espn_rank": 0.455
    },
    "misses": {
     "beat_projection": [
@@ -301,6 +381,86 @@
       "TE": 0.583
      }
     }
+   },
+   "metrics_with_rookies": {
+    "model": {
+     "n": 200,
+     "spearman_points": 0.633,
+     "mae_points": 58.5,
+     "spearman_vorp": 0.562,
+     "spearman_by_pos": {
+      "QB": 0.104,
+      "RB": 0.682,
+      "TE": 0.004,
+      "WR": 0.601
+     },
+     "top_n_hit_rate": {
+      "QB": 0.667,
+      "RB": 0.667,
+      "WR": 0.542,
+      "TE": 0.5
+     }
+    },
+    "espn": {
+     "n": 199,
+     "spearman_points": 0.663,
+     "mae_points": 64.3,
+     "spearman_vorp": 0.574,
+     "spearman_by_pos": {
+      "QB": 0.015,
+      "RB": 0.709,
+      "TE": 0.28,
+      "WR": 0.597
+     },
+     "top_n_hit_rate": {
+      "QB": 0.5,
+      "RB": 0.792,
+      "WR": 0.542,
+      "TE": 0.583
+     }
+    },
+    "naive": {
+     "n": 200,
+     "spearman_points": 0.449,
+     "mae_points": 77.4,
+     "spearman_vorp": 0.387,
+     "spearman_by_pos": {
+      "QB": 0.098,
+      "RB": 0.437,
+      "TE": 0.176,
+      "WR": 0.408
+     },
+     "top_n_hit_rate": {
+      "QB": 0.583,
+      "RB": 0.583,
+      "WR": 0.5,
+      "TE": 0.5
+     }
+    },
+    "espn_rank": {
+     "n": 200,
+     "spearman_points": 0.494,
+     "mae_points": null,
+     "spearman_vorp": 0.507,
+     "spearman_by_pos": {
+      "QB": 0.095,
+      "RB": 0.683,
+      "TE": 0.242,
+      "WR": 0.615
+     },
+     "top_n_hit_rate": {
+      "QB": 0.583,
+      "RB": 0.708,
+      "WR": 0.542,
+      "TE": 0.583
+     }
+    }
+   },
+   "rookies": {
+    "n": 26,
+    "model": 0.64,
+    "espn": 0.543,
+    "espn_rank": 0.445
    },
    "misses": {
     "beat_projection": [

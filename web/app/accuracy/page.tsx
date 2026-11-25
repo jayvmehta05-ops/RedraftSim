@@ -18,6 +18,8 @@ interface Result {
   pool: number;
   rookies_excluded: number;
   metrics: Record<"model" | "espn" | "espn_rank" | "naive", MethodMetrics>;
+  metrics_with_rookies?: Record<"model" | "espn" | "espn_rank" | "naive", MethodMetrics>;
+  rookies?: { n: number; model: number | null; espn: number | null; espn_rank: number | null };
   misses: { beat_projection: Miss[]; missed_projection: Miss[] };
 }
 const bt = backtestJson as unknown as { generatedAt: string; poolDefinition: string; results: Result[] };
@@ -52,8 +54,8 @@ export default function AccuracyPage() {
       <h1 className="mt-3 text-2xl font-bold text-white">How accurate are the projections?</h1>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
         Each season below was projected using only the two seasons before it, with the same engine that builds the {TARGET} board,
-        then scored against what actually happened. Players: {bt.poolDefinition} (rookies need a draft-capital model and are
-        scored separately). Higher correlation is better; lower average miss is better. Best value per column in green.
+        then scored against what actually happened. Players: {bt.poolDefinition} (rookies are projected from
+        draft-slot history and reported separately below each table). Higher correlation is better; lower average miss is better. Best value per column in green.
       </p>
       <p className="mt-2 max-w-3xl text-xs leading-relaxed text-slate-500">
         Fair-comparison note: ESPN&apos;s preseason numbers include offseason news (trades, depth charts, injuries) that this
@@ -93,6 +95,15 @@ export default function AccuracyPage() {
               </tbody>
             </table>
           </div>
+          {r.rookies && r.metrics_with_rookies && (
+            <div className="mt-3 rounded-xl bg-slate-900/60 p-3 text-xs text-slate-400 ring-1 ring-slate-800">
+              <span className="font-semibold text-slate-200">Rookies ({r.rookies.n}):</span> rank correlation — model{" "}
+              <b className="text-slate-200">{r.rookies.model?.toFixed(2)}</b> (draft-slot history only), ESPN projections{" "}
+              <b className="text-slate-200">{r.rookies.espn?.toFixed(2)}</b>, ESPN rankings <b className="text-slate-200">{r.rookies.espn_rank?.toFixed(2)}</b>.
+              {" "}Whole pool including rookies: model {r.metrics_with_rookies.model.spearman_points.toFixed(2)}, ESPN{" "}
+              {r.metrics_with_rookies.espn.spearman_points.toFixed(2)}, ESPN rankings {r.metrics_with_rookies.espn_rank.spearman_points.toFixed(2)}.
+            </div>
+          )}
           <div className="mt-3 grid gap-3 md:grid-cols-2">
             {([["Beat their projection", r.misses.beat_projection], ["Fell short of their projection", r.misses.missed_projection]] as const).map(([t, rows]) => (
               <div key={t} className="rounded-xl bg-slate-900/60 p-3 text-xs ring-1 ring-slate-800">

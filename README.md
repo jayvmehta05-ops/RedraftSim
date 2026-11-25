@@ -52,7 +52,10 @@ cd web && npm install && npm run dev       # http://localhost:3000
    Year-2 players get +10% (WR/TE), +6% (QB), +5% (RB); Year-3 players get a smaller bump.
 3. **Injuries.** IR/PUP/Out players with ACL, Achilles, Lisfranc, fractures and similar lose projected games plus a little efficiency. Minor IR stints get a small games haircut.
 4. **Role.** Free agents lose 15% of volume. Healthy backup QBs on the depth chart get about 35% of starts. QBs 38+ lose 20% of games for retirement risk.
-5. **Rookies.** `rookies_2027.csv` rows map to per-game templates by position × draft-capital tier (1 = top-10 pick … 5 = Day 3), scaled by `talent_grade`.
+5. **Rookies.** `scripts/rookie_model.py` learns first-season production by position and draft slot from every QB/RB/WR/TE
+   drafted since 2012 (busts included, later picks never projected above earlier ones) and writes `data/rookie_curve.json`.
+   Each prospect in `rookies_<target>.csv` is projected from its `projected_pick` (or its draft-capital tier) × `talent_grade`.
+   Re-run the script once a year after the season ends.
    `adp_override` pins a rookie's ADP if you want to.
 6. **VORP.** Season points minus the replacement level, which is the average of the 3 players just after the last projected starter at each
    position. Starters = slots × teams, plus FLEX spots given to the best remaining RB/WR/TE. Tiers come from gaps in VORP.
@@ -142,6 +145,16 @@ Without a destination, feedback only lands in Vercel's runtime logs, which Hobby
 ESPN has no third-party sign-in, so private leagues use the viewer's own `espn_s2` and `SWID` cookies. They're sent in a POST body
 (never a URL), forwarded to ESPN for that one request, and never stored or logged server-side; the browser keeps them only if the
 user ticks "Remember on this device".
+
+## Model changelog (backtest-driven)
+
+| Change | 2023–25 avg rank corr | Shipped |
+| --- | --- | --- |
+| Baseline (usage + efficiency regression + age curve) | 0.565 | yes |
+| + target-season rosters (Week 1 in backtests, Sleeper live): unsigned / reserve / team changes | **0.582** | yes |
+| + team volume pools (redistribute vacated targets/carries) | 0.567–0.577 | no (`team_context: false`) |
+| + QB-quality adjustment for pass catchers | 0.562–0.579 | no |
+| Rookie curve from draft history (rookies-only corr 2024 / 2025) | 0.41 / 0.64 (ESPN 0.62 / 0.54) | yes (replaces hand-made templates) |
 
 ## Before charging money
 
