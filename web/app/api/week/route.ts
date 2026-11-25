@@ -5,6 +5,7 @@
  * Cached at the CDN for 30 minutes (projections and injury tags change through the week), so ESPN
  * sees at most a couple of requests an hour no matter how many people use Start/Sit.
  */
+import { connection } from "next/server";
 import { STAT_KEYS, type StatKey } from "@/lib/types";
 import type { WeekData } from "@/lib/weekly";
 
@@ -28,8 +29,8 @@ async function json<T>(url: string, headers: Record<string, string> = {}): Promi
 interface Game { homeProTeamId: number; awayProTeamId: number; date: number }
 interface ProTeam { id: number; abbrev: string; byeWeek: number; proGamesByScoringPeriod?: Record<string, Game[]> }
 
-export async function GET(request: Request) {
-  void request; // read the request so this handler always runs on demand (cached by the CDN header below)
+export async function GET() {
+  await connection(); // always run on request (never at build time); the CDN header below does the caching
   try {
     const state = await json<{ week: number; season: string; season_type: string }>("https://api.sleeper.app/v1/state/nfl");
     const season = Number(state.season);
