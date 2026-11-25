@@ -6,6 +6,7 @@ import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/e
 import { buildLeaguemateBots } from "@/lib/leaguemates";
 import { type ProfileOverride, effectiveProfile } from "@/lib/profiles";
 import { keepRosterEdits } from "@/lib/rosters";
+import AccountButton from "./AccountButton";
 import BigBoard from "./BigBoard";
 import LeagueEditor from "./LeagueEditor";
 import FeedbackButton from "./Feedback";
@@ -239,9 +240,10 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
               </button>
             ))}
           </nav>
-          <div className="ml-auto lg:hidden"><FeedbackButton inline context={{ tab, league: league ? league.provider : "none" }} /></div>
+          <div className="ml-auto flex items-center gap-2"><AccountButton /></div>
+          <div className="lg:hidden"><FeedbackButton inline context={{ tab, league: league ? league.provider : "none" }} /></div>
           <button onClick={() => setSettingsOpen(true)}
-            className={`flex shrink-0 lg:ml-auto items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ring-1 transition ${nonDefault || league ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/40 hover:bg-emerald-500/20" : "bg-slate-900 text-slate-200 ring-slate-700 hover:bg-slate-800"}`}>
+            className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ring-1 transition ${nonDefault || league ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/40 hover:bg-emerald-500/20" : "bg-slate-900 text-slate-200 ring-slate-700 hover:bg-slate-800"}`}>
             <IconSettings className="h-4 w-4" />
             <span className="hidden sm:inline">{league ? "Your league" : "League settings"}</span>
           </button>
@@ -273,6 +275,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
       <footer className="mx-auto max-w-7xl px-4 pb-28 text-[11px] leading-relaxed text-slate-600 lg:pb-8">
         <div className="mb-2 flex gap-4 text-xs">
+          <a href="/about" className="text-emerald-400/80 hover:text-emerald-300">About</a>
           <a href="/guide" className="text-emerald-400/80 hover:text-emerald-300">How it works</a>
           <a href="/accuracy" className="text-emerald-400/80 hover:text-emerald-300">How accurate are these projections?</a>
           <a href="/risers" className="text-emerald-400/80 hover:text-emerald-300">This week&apos;s risers &amp; fallers</a>
@@ -281,6 +284,10 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         projections{m.marketSource === "espn" ? "; ESPN ADP is the market signal" : "; ESPN unavailable, Sleeper rank used as market"}),
         nflverse weekly player stats, DynastyProcess ID map,
         an editable list of the incoming {TARGET} rookie class. Projections are model estimates, not guarantees.
+        <div className="mt-2">
+          Not affiliated with or endorsed by the NFL, ESPN, Sleeper or Yahoo. ·{" "}
+          <a href="/privacy" className="hover:text-slate-400">Privacy</a> · <a href="/terms" className="hover:text-slate-400">Terms</a>
+        </div>
       </footer>
 
       {/* Phone / tablet: app-style bottom tabs */}
