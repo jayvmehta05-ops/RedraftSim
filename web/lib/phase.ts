@@ -41,10 +41,13 @@ export function seasonPhase(throughWeek: number, league: ImportedLeague | null, 
   let deadlineWeek: number | null = sched?.tradeDeadlineWeek ?? null;
   let tradesOpen = week < playoffStart;
   if (deadlineWeek != null) tradesOpen = tradesOpen && week <= deadlineWeek;
+  let deadlineDays: number | null = null;
   if (sched?.tradeDeadlineAt && now) {
     tradesOpen = tradesOpen && now < sched.tradeDeadlineAt;
-    // rough week count to the date, for the countdown
-    deadlineWeek = week + Math.max(0, Math.floor((sched.tradeDeadlineAt - now) / (7 * 864e5)));
+    // calendar days in the viewer's time zone (so deadline morning says "today", not "tomorrow")
+    const midnight = (t: number) => { const d = new Date(t); d.setHours(0, 0, 0, 0); return d.getTime(); };
+    deadlineDays = Math.max(0, Math.round((midnight(sched.tradeDeadlineAt) - midnight(now)) / 864e5));
+    deadlineWeek = week + Math.round(deadlineDays / 7);
   }
   const deadlineIn = tradesOpen && deadlineWeek != null ? Math.max(0, deadlineWeek - week) : null;
 
@@ -56,7 +59,14 @@ export function seasonPhase(throughWeek: number, league: ImportedLeague | null, 
   else if (week <= 4) phase = "early";
   else phase = "midseason";
 
-  const deadlineText = deadlineIn == null ? "" : deadlineIn === 0 ? " · trade deadline is this week" : ` · ${deadlineIn} week${deadlineIn === 1 ? "" : "s"} to the trade deadline`;
+  let deadlineText = "";
+  if (tradesOpen && deadlineDays != null && sched?.tradeDeadlineAt) {
+    // Date-based deadline (ESPN): count days and name the day
+    const day = new Date(sched.tradeDeadlineAt).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+    deadlineText = deadlineDays <= 1 ? ` · trade deadline ${deadlineDays === 0 ? "today" : "tomorrow"} (${day})` : ` · trade deadline in ${deadlineDays} days (${day})`;
+  } else if (deadlineIn != null) {
+    deadlineText = deadlineIn === 0 ? " · trade deadline is this week" : ` · ${deadlineIn} week${deadlineIn === 1 ? "" : "s"} to the trade deadline`;
+  }
   const toPlayoffs = playoffStart - week;
   const headlines: Record<Phase, string> = {
     preseason: "Draft season",
@@ -76,5 +86,9 @@ export function seasonPhase(throughWeek: number, league: ImportedLeague | null, 
     playoffs: `Only the next ${weeksLeft} week${weeksLeft === 1 ? "" : "s"} matter${weeksLeft === 1 ? "s" : ""}, so values count just those weeks. Set the best lineup in Start/Sit and grab hot free agents for this week.`,
     offseason: "Rosters reset in redraft. The next season's board and mock drafts are ready.",
   };
-  return { phase, week, playoffStart, lastWeek, weeksLeft: phase === "offseason" ? 0 : weeksLeft, tradesOpen, deadlineIn, headline: headlines[phase], tip: tips[phase] };
+  const deadlineSoon = tradesOpen && (deadlineIn === 0 || (deadlineDays != null && deadlineDays <= 7));
+  const tip = deadlineSoon && (phase === "early" || phase === "midseason")
+    ? "The trade deadline is close: this is your last chance to deal. Check Trades for offers your leaguemates would take, and lock anyone on a 1-week trade."
+    : tips[phase];
+  return { phase, week, playoffStart, lastWeek, weeksLeft: phase === "offseason" ? 0 : weeksLeft, tradesOpen, deadlineIn, headline: headlines[phase], tip };
 }
