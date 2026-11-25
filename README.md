@@ -146,6 +146,14 @@ Project → Settings → Environment Variables, then redeploy:
 
 Without a destination, feedback only lands in Vercel's runtime logs, which Hobby plans keep for a short time.
 
+## Roster refresh and ESPN cookies
+
+- Opening **My League** refreshes rosters automatically when they're more than 12 hours old (from the user's browser; for ESPN
+  private leagues only when cookies are remembered on that device). A small note says when it happened.
+- If ESPN rejects the cookies (they expire on logout or password change) or none are saved, My League shows an in-place
+  "Update login & refresh" box instead of sending the user back to Settings.
+- Re-importing a league you already have keeps your hand roster edits, the same as a refresh.
+
 ## Reliability and data
 
 - **Error reports:** uncaught errors, failed promises and crashes (`app/error.tsx`) are posted to `/api/feedback` as kind `error`,

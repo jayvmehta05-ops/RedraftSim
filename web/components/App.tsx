@@ -135,6 +135,9 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       while (savedLeagues[`manual:${lg.leagueId}-${n}`]) n += 1;
       incoming = { ...lg, leagueId: `${lg.leagueId}-${n}` };
     }
+    // Re-importing a league you already have keeps your hand roster edits (like a refresh does)
+    const existing = savedLeagues[leagueKey(incoming)];
+    if (existing) incoming = keepRosterEdits(existing, incoming);
     storeSaved({ ...savedLeagues, [leagueKey(incoming)]: incoming });
     activate(incoming);
     return incoming;

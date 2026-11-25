@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } from "@/lib/refresh";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import PowerRankings from "./PowerRankings";
@@ -9,6 +10,39 @@ import Waivers from "./Waivers";
 
 type Section = "trades" | "waivers" | "power";
 
+/** Shown when ESPN needs fresh login cookies for a private league; retries the refresh on submit. */
+function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember: boolean) => void; busy: boolean; error: string | null }) {
+  const [s2, setS2] = useState("");
+  const [swid, setSwid] = useState("");
+  const [remember, setRemember] = useState(true);
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); if (s2.trim() && swid.trim()) onSubmit({ espnS2: s2.trim(), swid: swid.trim() }, remember); }}
+      className="rounded-xl bg-amber-500/10 p-4 ring-1 ring-amber-500/30">
+      <div className="text-sm font-semibold text-amber-200">ESPN needs your login to refresh this private league</div>
+      <p className="mt-1 text-xs text-slate-400">
+        {error ?? "Your saved ESPN cookies are missing or expired (they expire when you log out of ESPN)."} On a computer, open fantasy.espn.com
+        while logged in → F12 → Application → Cookies → espn.com → copy <b>espn_s2</b> and <b>SWID</b>.
+      </p>
+      <div className="mt-2 grid gap-2 sm:grid-cols-2">
+        <input value={s2} onChange={(e) => setS2(e.target.value)} placeholder="espn_s2" type="password" autoComplete="off"
+          className="rounded-md bg-slate-900 px-2 py-1.5 text-xs text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
+        <input value={swid} onChange={(e) => setSwid(e.target.value)} placeholder="SWID, like {XXXXXXXX-...}" autoComplete="off"
+          className="rounded-md bg-slate-900 px-2 py-1.5 text-xs text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <label className="flex items-center gap-2 text-xs text-slate-300">
+          <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-emerald-500" />
+          Remember on this device
+        </label>
+        <button type="submit" disabled={busy || !s2.trim() || !swid.trim()}
+          className="ml-auto rounded-lg bg-emerald-500 px-4 py-1.5 text-xs font-bold text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">
+          {busy ? "Refreshing…" : "Update login & refresh"}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /** "My League": trades, waivers and power rankings for an imported (or hand-made) league. */
 export default function LeagueHub(props: {
   board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague | null; myManager: string | null;
@@ -16,7 +50,38 @@ export default function LeagueHub(props: {
   onLeagueRefreshed: (l: ImportedLeague) => void; onChooseManager: (id: string | null) => void; onOpenEditor: () => void;
 }) {
   const [section, setSection] = useState<Section>("trades");
-  const { league, myManager } = props;
+  const { league, myManager, onLeagueRefreshed } = props;
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [needsLogin, setNeedsLogin] = useState(false);
+  const [autoNote, setAutoNote] = useState<string | null>(null);
+
+  const refresh = async (auth?: EspnAuth | null, auto = false) => {
+    if (!league || league.provider === "manual") return;
+    setRefreshing(true);
+    setRefreshError(null);
+    const r = await fetchLatest(league, auth);
+    setRefreshing(false);
+    if (r.league) {
+      onLeagueRefreshed(r.league);
+      setNeedsLogin(false);
+      if (auto) setAutoNote("Rosters were more than 12 hours old, so they were refreshed automatically.");
+    } else {
+      setNeedsLogin(!!r.needsLogin);
+      // A failed automatic refresh stays quiet unless ESPN needs a login
+      if (!auto || r.needsLogin) setRefreshError(r.error ?? "Refresh failed");
+    }
+  };
+
+  // Opening My League with stale rosters refreshes them in the background (from this browser)
+  const leagueId = league ? `${league.provider}:${league.leagueId}` : "";
+  useEffect(() => {
+    if (!league || !isStale(league, Date.now())) return;
+    if (league.provider === "espn" && !savedEspnAuth()) return; // don't nag before the user tries a manual refresh
+    const t = setTimeout(() => refresh(null, true), 0);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leagueId]);
   // Waivers and power rankings need rosters (and waivers needs your team); the Trades view walks users through that
   const ready = !!league?.rosters?.some((r) => r.playerIds.length || (r.manualIds ?? []).length);
   const sections: { id: Section; label: string; needsMe: boolean }[] = [
@@ -37,7 +102,18 @@ export default function LeagueHub(props: {
           </button>
         ))}
       </div>
-      {(section === "trades" || blocked) && <TradeAssistant {...props} />}
+      {needsLogin && league?.provider === "espn" && (
+        <EspnLogin busy={refreshing} error={refreshError && /rejected/i.test(refreshError) ? refreshError : null} onSubmit={(a, remember) => { if (remember) rememberEspnAuth(a); refresh(a); }} />
+      )}
+      {autoNote && !needsLogin && (
+        <div className="flex items-center gap-2 rounded-lg bg-slate-900/70 px-3 py-2 text-xs text-slate-400 ring-1 ring-slate-800">
+          {autoNote}
+          <button onClick={() => setAutoNote(null)} className="ml-auto text-slate-500 hover:text-white" aria-label="Dismiss">✕</button>
+        </div>
+      )}
+      {(section === "trades" || blocked) && (
+        <TradeAssistant {...props} onRefresh={() => refresh()} refreshing={refreshing} refreshError={needsLogin ? null : refreshError} />
+      )}
       {section === "waivers" && !blocked && league && myManager && (
         <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} />
       )}

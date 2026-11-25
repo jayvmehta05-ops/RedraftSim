@@ -23,9 +23,12 @@ interface Props {
   onLeagueRefreshed: (l: ImportedLeague) => void;
   onChooseManager: (id: string | null) => void;
   onOpenEditor: () => void;
+  /** provided by My League: re-import rosters (handles ESPN login prompts) */
+  onRefresh: () => void;
+  refreshing: boolean;
+  refreshError: string | null;
 }
 
-const ESPN_AUTH_KEY = "redraft27.espnAuth";
 
 function acceptLabel(a: number) {
   if (a >= 0.6) return { text: "Likely yes", cls: "bg-emerald-500/20 text-emerald-300" };
@@ -88,10 +91,8 @@ function Empty({ title, body, action, error }: { title: string; body: string; ac
   );
 }
 
-export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, onOpenSettings, onLeagueRefreshed, onChooseManager, onOpenEditor }: Props) {
+export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, onOpenSettings, onChooseManager, onOpenEditor, onRefresh, refreshing, refreshError }: Props) {
   const [horizon, setHorizon] = useState<Horizon>(weeksLeft > 2 ? "ros" : "next");
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [partnerId, setPartnerId] = useState<string | null>(null);
   const [give, setGive] = useState<Set<string>>(new Set());
   const [get, setGet] = useState<Set<string>>(new Set());
@@ -127,28 +128,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
     return sums;
   }, [teams, cfg]);
 
-  const refresh = async () => {
-    if (!league) return;
-    setRefreshing(true);
-    setRefreshError(null);
-    try {
-      let auth = {};
-      if (league.provider === "espn") {
-        try { auth = JSON.parse(localStorage.getItem(ESPN_AUTH_KEY) ?? "{}"); } catch { /* none saved */ }
-      }
-      const r = await fetch("/api/league", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider: league.provider, id: league.leagueId, season: Number(league.season), ...auth }),
-      });
-      const body = await r.json();
-      if (!r.ok) throw new Error(body.error ?? "Refresh failed");
-      onLeagueRefreshed(body);
-    } catch (e) {
-      setRefreshError(e instanceof Error ? e.message : "Refresh failed");
-    } finally {
-      setRefreshing(false);
-    }
-  };
+  const refresh = onRefresh;
 
   // ------------------------------------------------------------------ empty states
   if (!league) {
