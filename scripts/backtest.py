@@ -31,7 +31,7 @@ sys.path.insert(0, os.path.dirname(__file__))
 from common import (  # noqa: E402
     DATA_DIR, FANTASY_POSITIONS, STAT_COMPONENTS, WEB_DATA_DIR, load_config, merge_name, points_per_game,
 )
-from project_2027 import build_veteran_projections, replacement_levels  # noqa: E402
+from project_2027 import build_veteran_projections, clean_json, replacement_levels  # noqa: E402
 from update_data import (  # noqa: E402
     ESPN_PLAYERS, ESPN_POS, ESPN_STAT_IDS, HEADERS, ID_MAP_URL, SLEEPER, attach_player_ids,
     fetch_nflverse_weekly, get_csv, get_json,
@@ -238,7 +238,7 @@ def main() -> None:
            "poolDefinition": f"ESPN preseason PPR top {POOL_SIZE}, veterans only",
            "scoring": "league_settings.json defaults", "results": results}
     for path in (DATA_DIR / "backtest.json", WEB_DATA_DIR / "backtest.json"):
-        path.write_text(json.dumps(out, indent=1), encoding="utf-8")
+        path.write_text(json.dumps(clean_json(out), indent=1, allow_nan=False), encoding="utf-8")
 
     for r in results:
         print(f"\n=== {r['target']} (pool {r['pool']}) ===")

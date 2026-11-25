@@ -1,5 +1,5 @@
 {
- "generatedAt": "2026-11-25T05:00:15+00:00",
+ "generatedAt": "2026-11-25T05:01:09+00:00",
  "poolDefinition": "ESPN preseason PPR top 200, veterans only",
  "scoring": "league_settings.json defaults",
  "results": [
@@ -430,7 +430,7 @@
       "name": "Amari Cooper",
       "position": "WR",
       "model_points": 152.5,
-      "espn_points": NaN,
+      "espn_points": null,
       "actual_points": 0.0,
       "actual_games": 0
      }
