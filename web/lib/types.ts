@@ -35,6 +35,8 @@ export interface RawPlayer {
   proj: StatLine;
   marketRank: number | null;
   adpOverride: number | null;
+  /** ESPN player id (maps ESPN league rosters onto the board) */
+  espnId?: string | null;
   /** ESPN average draft position (PPR), roster %, and per-game rest-of-season projection */
   espnAdp: number | null;
   espnOwned: number | null;
@@ -175,4 +177,7 @@ export interface ImportedLeague {
   notes: string[];
   managers: { id: string; name: string }[];
   drafts: LeagueDraft[];
+  /** current rosters; player ids are Sleeper ids or ESPN ids depending on idType */
+  rosters?: { managerId: string; playerIds: string[]; idType: "sleeper" | "espn" }[];
+  fetchedAt?: string;
 }

@@ -48,6 +48,17 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
     ],
   },
   {
+    title: "Trade assistant",
+    what: "Finds trades that improve your starting lineup and that the other manager would plausibly accept, and grades any trade you're considering.",
+    how: [
+      "Import your league (Settings) and pick your team. The assistant loads every roster.",
+      "Choose the time frame: rest of this season for in-season trades, next season for the offseason, or both for keeper leagues.",
+      "Each suggestion shows how many points it adds to your best lineup, what it does to theirs, and a chance they say yes based on their lineup gain, how the names look by ADP, and what they've favored in past drafts.",
+      "Use the analyzer to tick any players on either side and see the result instantly.",
+    ],
+    tip: "Win-win trades get accepted. The assistant only suggests trades that don't meaningfully hurt the other team.",
+  },
+  {
     title: "Keepers",
     what: "For keeper leagues: is a player worth the pick he costs you?",
     how: [

@@ -607,6 +607,7 @@ def clean_json(o):
 
 
 def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int) -> None:
+    espn_id_of = dict(con.execute("SELECT player_id, espn_id FROM espn_players WHERE player_id IS NOT NULL").fetchall())
     # Publication switches: turn these off before charging money. NFL headshots are copyrighted, and
     # ESPN's terms restrict commercial reuse of its data (the model can still use ESPN internally).
     pub = {"show_headshots": True, "show_espn_fields": True, **cfg.get("publication", {})}
@@ -634,6 +635,7 @@ def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int
             "touchShare": r.touch_share_2026, "s26": r.stats_2026,
             "projGames": r.proj_games, "proj": r.proj,
             "marketRank": None if pd.isna(r.market_rank) else int(r.market_rank),
+            "espnId": espn_id_of.get(r.player_id),
             "espnAdp": None if pd.isna(r.espn_adp) or not pub["show_espn_fields"] else round(float(r.espn_adp), 1),
             "espnOwned": None if pd.isna(r.espn_owned) or not pub["show_espn_fields"] else round(float(r.espn_owned), 1),
             "espnRos": r.espn_ros if isinstance(r.espn_ros, dict) and pub["show_espn_fields"] else None,

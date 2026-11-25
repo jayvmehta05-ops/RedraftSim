@@ -13,6 +13,7 @@ export const IconMock = ({ className }: P) => svg(<><rect x="3" y="3" width="7" 
 export const IconLive = ({ className }: P) => svg(<><circle cx="12" cy="12" r="2.5" /><path d="M7.8 7.8a6 6 0 0 0 0 8.4M16.2 7.8a6 6 0 0 1 0 8.4M5 5a10 10 0 0 0 0 14M19 5a10 10 0 0 1 0 14" /></>, className);
 export const IconKeeper = ({ className }: P) => svg(<><path d="M6 4h12v16l-6-4-6 4z" /></>, className);
 export const IconTrend = ({ className }: P) => svg(<><path d="M3 17l6-6 4 4 8-8" /><path d="M15 7h6v6" /></>, className);
+export const IconSwap = ({ className }: P) => svg(<><path d="M4 8h13l-3-3M20 16H7l3 3" /></>, className);
 export const IconSettings = ({ className }: P) => svg(<><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2" /><circle cx="10" cy="17" r="2" /></>, className);
 export const IconClose = ({ className }: P) => svg(<path d="M6 6l12 12M18 6L6 18" />, className);
 export const IconArrow = ({ className }: P) => svg(<path d="M5 12h14M13 6l6 6-6 6" />, className);

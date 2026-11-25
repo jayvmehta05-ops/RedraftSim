@@ -108,6 +108,11 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
   const users = await getJson<{ user_id: string; display_name: string }[]>(
     `https://api.sleeper.app/v1/league/${lg.league_id}/users`).catch(() => []);
   const managers = users.map((u) => ({ id: u.user_id, name: u.display_name }));
+  const sleeperRosters = await getJson<{ roster_id: number; owner_id: string | null; players: string[] | null }[]>(
+    `https://api.sleeper.app/v1/league/${lg.league_id}/rosters`).catch(() => []);
+  const rosters = sleeperRosters
+    .filter((r) => r.owner_id)
+    .map((r) => ({ managerId: String(r.owner_id), playerIds: (r.players ?? []).map(String), idType: "sleeper" as const }));
   const drafts: LeagueDraft[] = [];
   let leagueId: string | null = lg.league_id;
   for (let hop = 0; hop < 3 && leagueId; hop++) {
@@ -136,6 +141,7 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
   if (leagueType === 1) notes.push("Keeper league: keepers aren't removed from the mock draft pool yet");
   const fullDrafts = drafts.filter((d) => Math.max(0, ...d.picks.map((p) => p.round)) >= Math.min(8, slotsTotal / 2));
   return {
+    rosters, fetchedAt: new Date().toISOString(),
     provider: "sleeper", leagueId: lg.league_id, season: lg.season, name: lg.name,
     teams: lg.total_rosters, roster, scoring, draftRounds: slotsTotal,
     notes: Array.from(new Set(notes)), managers, drafts: fullDrafts,
@@ -150,7 +156,10 @@ interface EspnLeague {
     scoringSettings: { scoringItems: { statId: number; points: number; pointsOverrides?: Record<string, number> }[] };
     draftSettings?: { type?: string };
   };
-  teams?: { id: number; name?: string; location?: string; nickname?: string; owners?: string[] }[];
+  teams?: {
+    id: number; name?: string; location?: string; nickname?: string; owners?: string[];
+    roster?: { entries?: { playerId: number }[] };
+  }[];
   members?: { id: string; displayName: string }[];
   draftDetail?: { drafted?: boolean; picks?: { overallPickNumber: number; roundId: number; teamId: number; playerId: number }[] };
 }
@@ -170,7 +179,7 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
   const base = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${encodeURIComponent(id)}`;
   let lg: EspnLeague;
   try {
-    lg = await getJson<EspnLeague>(`${base}?view=mSettings&view=mTeam&view=mDraftDetail`, { headers: cookieHeader(auth) });
+    lg = await getJson<EspnLeague>(`${base}?view=mSettings&view=mTeam&view=mDraftDetail&view=mRoster`, { headers: cookieHeader(auth) });
   } catch (e) {
     if (e instanceof ImportError && e.message === "PRIVATE") {
       throw new ImportError(auth?.espnS2
@@ -232,6 +241,10 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
   }
   const starters = roster.QB + roster.RB + roster.WR + roster.TE + roster.FLEX + roster.SUPERFLEX + roster.K + roster.DST;
   return {
+    rosters: (lg.teams ?? []).map((t) => ({
+      managerId: String(t.id), playerIds: (t.roster?.entries ?? []).map((e) => String(e.playerId)), idType: "espn" as const,
+    })),
+    fetchedAt: new Date().toISOString(),
     provider: "espn", leagueId: id, season: String(season), name: s.name, teams: s.size,
     roster, scoring, draftRounds: starters + roster.BENCH, notes: Array.from(new Set(notes)), managers, drafts,
   };

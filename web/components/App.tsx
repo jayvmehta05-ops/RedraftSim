@@ -10,15 +10,17 @@ import KeeperCalc from "./KeeperCalc";
 import LiveDraft from "./LiveDraft";
 import MockDraft from "./MockDraft";
 import SettingsDrawer from "./SettingsDrawer";
+import TradeAssistant from "./TradeAssistant";
 import TrendTracker from "./TrendTracker";
 import Welcome from "./Welcome";
-import { IconBoard, IconKeeper, IconLive, IconMock, IconSettings, IconTrend, Logo } from "./icons";
+import { IconBoard, IconKeeper, IconLive, IconMock, IconSettings, IconSwap, IconTrend, Logo } from "./icons";
 import { TARGET } from "@/lib/season";
 
 const TABS = [
   { id: "board", label: `${TARGET} Big Board`, short: "Board", icon: IconBoard },
   { id: "mock", label: "Mock Draft", short: "Mock", icon: IconMock },
   { id: "live", label: "Live Draft", short: "Live", icon: IconLive },
+  { id: "trades", label: "Trades", short: "Trades", icon: IconSwap },
   { id: "keepers", label: "Keepers", short: "Keepers", icon: IconKeeper },
   { id: "trends", label: "Trends", short: "Trends", icon: IconTrend },
 ] as const;
@@ -78,6 +80,11 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
     const t = defaultToggles(withLeague(siteConfig, lg));
     setToggles(t);
     save(STORAGE_KEY, t);
+  };
+  // Re-imported league (e.g. refreshed rosters): keep the chosen team and current toggles
+  const refreshLeague = (lg: ImportedLeague) => {
+    setLeague(lg);
+    save(LEAGUE_KEY, lg);
   };
   const chooseManager = (id: string | null) => {
     setMyManager(id);
@@ -168,6 +175,11 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} showEspn={m.publication?.show_espn_fields !== false} />}
         {tab === "mock" && <MockDraft board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} />}
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
+        {tab === "trades" && (
+          <TradeAssistant board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
+            weeksLeft={Math.max(0, 17 - m.throughWeek)} onOpenSettings={() => setSettingsOpen(true)}
+            onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} />
+        )}
         {tab === "keepers" && <KeeperCalc board={board} cfg={cfg} />}
         {tab === "trends" && <TrendTracker board={board} trends={trends} throughWeek={m.throughWeek} />}
       </main>
@@ -186,7 +198,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
       {/* Phone / tablet: app-style bottom tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-800 bg-slate-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Sections">
-        <div className="mx-auto grid max-w-lg grid-cols-5">
+        <div className="mx-auto grid max-w-lg grid-cols-6">
           {TABS.map(({ id, short, icon: Icon }) => (
             <button key={id} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined}
               className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${tab === id ? "text-emerald-400" : "text-slate-500"}`}>
