@@ -1,0 +1,441 @@
+{
+ "generatedAt": "2026-11-25T04:38:11+00:00",
+ "poolDefinition": "ESPN preseason PPR top 200, veterans only",
+ "scoring": "league_settings.json defaults",
+ "results": [
+  {
+   "target": 2024,
+   "data_seasons": [
+    2022,
+    2023
+   ],
+   "pool": 179,
+   "rookies_excluded": 21,
+   "metrics": {
+    "model": {
+     "n": 179,
+     "spearman_points": 0.528,
+     "mae_points": 60.0,
+     "spearman_vorp": 0.512,
+     "spearman_by_pos": {
+      "QB": 0.239,
+      "RB": 0.628,
+      "TE": -0.026,
+      "WR": 0.466
+     },
+     "top_n_hit_rate": {
+      "QB": 0.583,
+      "RB": 0.708,
+      "WR": 0.542,
+      "TE": 0.417
+     }
+    },
+    "espn": {
+     "n": 179,
+     "spearman_points": 0.655,
+     "mae_points": 54.0,
+     "spearman_vorp": 0.605,
+     "spearman_by_pos": {
+      "QB": 0.447,
+      "RB": 0.688,
+      "TE": 0.129,
+      "WR": 0.576
+     },
+     "top_n_hit_rate": {
+      "QB": 0.667,
+      "RB": 0.708,
+      "WR": 0.625,
+      "TE": 0.583
+     }
+    },
+    "naive": {
+     "n": 179,
+     "spearman_points": 0.471,
+     "mae_points": 69.9,
+     "spearman_vorp": 0.451,
+     "spearman_by_pos": {
+      "QB": 0.245,
+      "RB": 0.584,
+      "TE": -0.059,
+      "WR": 0.463
+     },
+     "top_n_hit_rate": {
+      "QB": 0.583,
+      "RB": 0.667,
+      "WR": 0.542,
+      "TE": 0.417
+     }
+    },
+    "espn_rank": {
+     "n": 179,
+     "spearman_points": 0.58,
+     "mae_points": null,
+     "spearman_vorp": 0.586,
+     "spearman_by_pos": {
+      "QB": 0.347,
+      "RB": 0.755,
+      "TE": 0.11,
+      "WR": 0.629
+     },
+     "top_n_hit_rate": {
+      "QB": 0.75,
+      "RB": 0.75,
+      "WR": 0.625,
+      "TE": 0.583
+     }
+    }
+   },
+   "misses": {
+    "beat_projection": [
+     {
+      "name": "Sam Darnold",
+      "position": "QB",
+      "model_points": 78.8,
+      "espn_points": 192.2,
+      "actual_points": 308.0,
+      "actual_games": 17
+     },
+     {
+      "name": "Chase Brown",
+      "position": "RB",
+      "model_points": 77.3,
+      "espn_points": 165.9,
+      "actual_points": 255.0,
+      "actual_games": 16
+     },
+     {
+      "name": "Ja'Marr Chase",
+      "position": "WR",
+      "model_points": 234.9,
+      "espn_points": 289.4,
+      "actual_points": 403.0,
+      "actual_games": 17
+     },
+     {
+      "name": "Aaron Rodgers",
+      "position": "QB",
+      "model_points": 100.5,
+      "espn_points": 265.1,
+      "actual_points": 256.6,
+      "actual_games": 17
+     },
+     {
+      "name": "Derrick Henry",
+      "position": "RB",
+      "model_points": 181.2,
+      "espn_points": 225.0,
+      "actual_points": 336.4,
+      "actual_games": 17
+     },
+     {
+      "name": "Baker Mayfield",
+      "position": "QB",
+      "model_points": 214.4,
+      "espn_points": 245.2,
+      "actual_points": 365.8,
+      "actual_games": 17
+     },
+     {
+      "name": "Jauan Jennings",
+      "position": "WR",
+      "model_points": 66.9,
+      "espn_points": 73.1,
+      "actual_points": 210.5,
+      "actual_games": 15
+     },
+     {
+      "name": "Lamar Jackson",
+      "position": "QB",
+      "model_points": 296.8,
+      "espn_points": 303.6,
+      "actual_points": 430.4,
+      "actual_games": 17
+     }
+    ],
+    "missed_projection": [
+     {
+      "name": "Christian McCaffrey",
+      "position": "RB",
+      "model_points": 294.1,
+      "espn_points": 335.4,
+      "actual_points": 47.8,
+      "actual_games": 4
+     },
+     {
+      "name": "Justin Fields",
+      "position": "QB",
+      "model_points": 274.5,
+      "espn_points": 89.5,
+      "actual_points": 119.1,
+      "actual_games": 10
+     },
+     {
+      "name": "Dak Prescott",
+      "position": "QB",
+      "model_points": 263.4,
+      "espn_points": 276.5,
+      "actual_points": 116.5,
+      "actual_games": 8
+     },
+     {
+      "name": "Chris Olave",
+      "position": "WR",
+      "model_points": 222.1,
+      "espn_points": 245.7,
+      "actual_points": 76.7,
+      "actual_games": 8
+     },
+     {
+      "name": "Mike Williams",
+      "position": "WR",
+      "model_points": 193.6,
+      "espn_points": 163.1,
+      "actual_points": 56.8,
+      "actual_games": 14
+     },
+     {
+      "name": "Brandon Aiyuk",
+      "position": "WR",
+      "model_points": 198.0,
+      "espn_points": 222.4,
+      "actual_points": 62.4,
+      "actual_games": 7
+     },
+     {
+      "name": "Nick Chubb",
+      "position": "RB",
+      "model_points": 191.4,
+      "espn_points": 134.0,
+      "actual_points": 63.3,
+      "actual_games": 8
+     },
+     {
+      "name": "T.J. Hockenson",
+      "position": "TE",
+      "model_points": 208.1,
+      "espn_points": 130.0,
+      "actual_points": 86.5,
+      "actual_games": 10
+     }
+    ]
+   }
+  },
+  {
+   "target": 2025,
+   "data_seasons": [
+    2023,
+    2024
+   ],
+   "pool": 174,
+   "rookies_excluded": 26,
+   "metrics": {
+    "model": {
+     "n": 174,
+     "spearman_points": 0.623,
+     "mae_points": 62.4,
+     "spearman_vorp": 0.523,
+     "spearman_by_pos": {
+      "QB": -0.017,
+      "RB": 0.705,
+      "TE": -0.062,
+      "WR": 0.584
+     },
+     "top_n_hit_rate": {
+      "QB": 0.667,
+      "RB": 0.708,
+      "WR": 0.542,
+      "TE": 0.583
+     }
+    },
+    "espn": {
+     "n": 174,
+     "spearman_points": 0.684,
+     "mae_points": 65.2,
+     "spearman_vorp": 0.592,
+     "spearman_by_pos": {
+      "QB": -0.026,
+      "RB": 0.769,
+      "TE": 0.229,
+      "WR": 0.63
+     },
+     "top_n_hit_rate": {
+      "QB": 0.5,
+      "RB": 0.75,
+      "WR": 0.542,
+      "TE": 0.583
+     }
+    },
+    "naive": {
+     "n": 174,
+     "spearman_points": 0.518,
+     "mae_points": 69.5,
+     "spearman_vorp": 0.427,
+     "spearman_by_pos": {
+      "QB": -0.029,
+      "RB": 0.59,
+      "TE": 0.253,
+      "WR": 0.466
+     },
+     "top_n_hit_rate": {
+      "QB": 0.583,
+      "RB": 0.625,
+      "WR": 0.5,
+      "TE": 0.583
+     }
+    },
+    "espn_rank": {
+     "n": 174,
+     "spearman_points": 0.492,
+     "mae_points": null,
+     "spearman_vorp": 0.515,
+     "spearman_by_pos": {
+      "QB": 0.045,
+      "RB": 0.712,
+      "TE": 0.187,
+      "WR": 0.621
+     },
+     "top_n_hit_rate": {
+      "QB": 0.583,
+      "RB": 0.75,
+      "WR": 0.583,
+      "TE": 0.583
+     }
+    }
+   },
+   "misses": {
+    "beat_projection": [
+     {
+      "name": "Christian McCaffrey",
+      "position": "RB",
+      "model_points": 232.6,
+      "espn_points": 318.3,
+      "actual_points": 416.6,
+      "actual_games": 17
+     },
+     {
+      "name": "Matthew Stafford",
+      "position": "QB",
+      "model_points": 196.9,
+      "espn_points": 273.9,
+      "actual_points": 350.4,
+      "actual_games": 17
+     },
+     {
+      "name": "Jaxon Smith-Njigba",
+      "position": "WR",
+      "model_points": 207.7,
+      "espn_points": 240.9,
+      "actual_points": 359.9,
+      "actual_games": 17
+     },
+     {
+      "name": "Trevor Lawrence",
+      "position": "QB",
+      "model_points": 213.5,
+      "espn_points": 279.1,
+      "actual_points": 338.2,
+      "actual_games": 17
+     },
+     {
+      "name": "Drake Maye",
+      "position": "QB",
+      "model_points": 231.3,
+      "espn_points": 285.0,
+      "actual_points": 352.0,
+      "actual_games": 17
+     },
+     {
+      "name": "George Pickens",
+      "position": "WR",
+      "model_points": 183.2,
+      "espn_points": 221.3,
+      "actual_points": 291.9,
+      "actual_games": 17
+     },
+     {
+      "name": "Jonathan Taylor",
+      "position": "RB",
+      "model_points": 254.4,
+      "espn_points": 288.7,
+      "actual_points": 362.3,
+      "actual_games": 17
+     },
+     {
+      "name": "Derrick Henry",
+      "position": "RB",
+      "model_points": 175.9,
+      "espn_points": 281.7,
+      "actual_points": 279.5,
+      "actual_games": 17
+     }
+    ],
+    "missed_projection": [
+     {
+      "name": "Malik Nabers",
+      "position": "WR",
+      "model_points": 307.4,
+      "espn_points": 301.3,
+      "actual_points": 57.1,
+      "actual_games": 4
+     },
+     {
+      "name": "Joe Mixon",
+      "position": "RB",
+      "model_points": 211.9,
+      "espn_points": 118.0,
+      "actual_points": 0.0,
+      "actual_games": 0
+     },
+     {
+      "name": "Jayden Daniels",
+      "position": "QB",
+      "model_points": 325.3,
+      "espn_points": 371.4,
+      "actual_points": 114.3,
+      "actual_games": 7
+     },
+     {
+      "name": "Brandon Aiyuk",
+      "position": "WR",
+      "model_points": 185.9,
+      "espn_points": 112.4,
+      "actual_points": 0.0,
+      "actual_games": 0
+     },
+     {
+      "name": "Najee Harris",
+      "position": "RB",
+      "model_points": 186.6,
+      "espn_points": 95.0,
+      "actual_points": 11.6,
+      "actual_games": 3
+     },
+     {
+      "name": "Kyler Murray",
+      "position": "QB",
+      "model_points": 251.6,
+      "espn_points": 306.7,
+      "actual_points": 77.8,
+      "actual_games": 5
+     },
+     {
+      "name": "Tyreek Hill",
+      "position": "WR",
+      "model_points": 218.4,
+      "espn_points": 263.6,
+      "actual_points": 53.5,
+      "actual_games": 4
+     },
+     {
+      "name": "Amari Cooper",
+      "position": "WR",
+      "model_points": 152.5,
+      "espn_points": 0.0,
+      "actual_points": 0.0,
+      "actual_games": 0
+     }
+    ]
+   }
+  }
+ ]
+}

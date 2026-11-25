@@ -75,17 +75,18 @@ def log(msg: str) -> None:
 
 
 # =========================================================================== helpers
-def age_2027(birth_date, age_now) -> float | None:
+def age_2027(birth_date, age_now, start: date = SEASON_2027_START) -> float | None:
+    """Age at the start of the target season (2027 unless a backtest passes another start date)."""
     if isinstance(birth_date, str) and len(birth_date) >= 10:
         try:
             b = date.fromisoformat(birth_date[:10])
-            return round((SEASON_2027_START - b).days / 365.25, 1)
+            return round((start - b).days / 365.25, 1)
         except ValueError:
             pass
-    return float(age_now) + 0.8 if pd.notna(age_now) else None
+    return float(age_now) + (start - date.today()).days / 365.25 if pd.notna(age_now) else None
 
 
-def age_multiplier(pos: str, age: float | None, years_exp) -> tuple[float, list[str]]:
+def age_multiplier(pos: str, age: float | None, years_exp, exp_offset: int = 2) -> tuple[float, list[str]]:
     """Age-curve + career-arc multiplier on 2027 volume. Returns (mult, reasons)."""
     m, why = 1.0, []
     if age is not None and not math.isnan(age):
@@ -103,7 +104,8 @@ def age_multiplier(pos: str, age: float | None, years_exp) -> tuple[float, list[
             pen = 0.04 * (a - 34)
             m *= 1 - pen; why.append(f"QB age {a}: -{pen:.0%}")
     if pd.notna(years_exp):
-        yr = int(years_exp) + 2  # NFL season number in 2027 (Sleeper years_exp is 0 for 2026 rookies)
+        # NFL season number in the target year. Sleeper years_exp is 0 for 2026 rookies, so 2027 = +2.
+        yr = int(years_exp) + exp_offset
         bump = {2: {"WR": 0.10, "TE": 0.10, "RB": 0.05, "QB": 0.06},
                 3: {"WR": 0.05, "TE": 0.06, "RB": 0.02, "QB": 0.04}}.get(yr, {}).get(pos, 0.0)
         if bump:
@@ -160,11 +162,22 @@ def load_espn(con, cfg, season: int, through_week: int) -> tuple[dict, dict]:
     return ros, market
 
 
-def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.DataFrame:
+def build_veteran_projections(con, cfg, season: int, through_week: int, *, ws: pd.DataFrame | None = None,
+                              players: pd.DataFrame | None = None, target_start: date = SEASON_2027_START,
+                              exp_offset: int = 2, live_flags: bool = True) -> pd.DataFrame:
+    """Project next season from `season` stats (through `through_week`) plus the prior season.
+
+    Backtests pass their own weekly stats (`ws`) and player table, an earlier `target_start` /
+    `exp_offset`, and live_flags=False to drop inputs that only exist for the current season
+    (Sleeper injury / depth chart / free-agent status and ESPN projections).
+    """
     pcfg = cfg["projection"]
-    ws = pd.read_sql_query(
-        "SELECT * FROM weekly_stats WHERE (season = ? AND week <= ?) OR season = ?",
-        con, params=(season, through_week, season - 1))
+    if ws is None:
+        ws = pd.read_sql_query(
+            "SELECT * FROM weekly_stats WHERE (season = ? AND week <= ?) OR season = ?",
+            con, params=(season, through_week, season - 1))
+    else:
+        ws = ws[((ws["season"] == season) & (ws["week"] <= through_week)) | (ws["season"] == season - 1)].copy()
     for c in STAT_COMPONENTS:
         ws[c] = ws[c].fillna(0.0)
     ws = ws[ws["position"].isin(FANTASY_POSITIONS)]
@@ -173,7 +186,8 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
     team_wk = ws.groupby(["season", "week", "team"])[["targets", "rush_att"]].sum().rename(
         columns={"targets": "team_targets", "rush_att": "team_rush"})
     ws = ws.join(team_wk, on=["season", "week", "team"])
-    ws["w"] = np.where(ws["season"] == season, RECENCY_DECAY ** (through_week - ws["week"]), 1.0)
+    decay = float(pcfg.get("recency_decay", RECENCY_DECAY))
+    ws["w"] = np.where(ws["season"] == season, decay ** (through_week - ws["week"]), 1.0)
 
     # Drop partial games (injury exits / garbage-time cameos): opportunities < 30% of the
     # player's median that season. They count as missed games for availability instead.
@@ -199,10 +213,11 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
 
     a26, a25 = agg(cur.dropna(subset=["player_id"]), True), agg(prv.dropna(subset=["player_id"]), False)
 
-    players = pd.read_sql_query("SELECT * FROM players WHERE is_rookie_2027 = 0", con).set_index("player_id")
+    if players is None:
+        players = pd.read_sql_query("SELECT * FROM players WHERE is_rookie_2027 = 0", con).set_index("player_id")
     pids = players.index.intersection(a26.index.union(a25.index))
     pw = pcfg["prior_season_weight"]
-    espn_ros, espn_mkt = load_espn(con, cfg, season, through_week)
+    espn_ros, espn_mkt = load_espn(con, cfg, season, through_week) if live_flags else ({}, {})
     espn_w = float(pcfg.get("espn_projection_weight", 0.0))
 
     # League-average efficiency by position (both seasons, volume weighted)
@@ -257,15 +272,17 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
 
         # Volume (small-sample shrink) * age/career multiplier * team status
         vol_mult = eff_g / (eff_g + 0.5)
-        m_age, why = age_multiplier(pos, age27 := age_2027(p["birth_date"], p["age"]), p["years_exp"])
+        m_age, why = age_multiplier(pos, age27 := age_2027(p["birth_date"], p["age"], target_start),
+                                    p["years_exp"], exp_offset)
         flags = []
         if any("ascension" in w for w in why):
             flags.append("ascending")
         if any("age" in w for w in why):
             flags.append("age_decline")
-        if not p["team"]:
+        if live_flags and not p["team"]:
             vol_mult *= 0.85; why.append("Free agent: -15% volume"); flags.append("free_agent")
-        g_mult, e_mult, inj_flag = injury_adjustment(pos, p["injury_status"], p["injury_body_part"], p["injury_notes"])
+        g_mult, e_mult, inj_flag = (injury_adjustment(pos, p["injury_status"], p["injury_body_part"], p["injury_notes"])
+                                    if live_flags else (1.0, 1.0, None))
         if inj_flag:
             flags.append("injury_recovery"); why.append(inj_flag)
         vm = vol_mult  # age/career multiplier is applied after the ESPN blend
@@ -292,9 +309,10 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
             hist = (g26 + g25) / max(tg26 + 17, g26 + g25)
         else:
             hist = g26 / max(tg26, g26, 1)
-        games = pcfg["base_games"] * (0.85 + 0.15 * hist) * g_mult
+        aw = float(pcfg.get("availability_weight", 0.15))
+        games = pcfg["base_games"] * ((1 - aw) + aw * hist) * g_mult
         # Depth-chart demotions of injured starters reflect the injury, not the role, so skip those.
-        if (pos == "QB" and (p["depth_chart_order"] or 1) > 1 and p["depth_chart_position"] == "QB"
+        if (live_flags and pos == "QB" and (p["depth_chart_order"] or 1) > 1 and p["depth_chart_position"] == "QB"
                 and p["injury_status"] not in SEVERE_STATUSES):
             games *= 0.35; flags.append("backup_qb"); why.append("Backup QB on depth chart: ~35% of starts")
         if age27 and age27 >= 38:
@@ -471,6 +489,9 @@ def clean_json(o):
 
 
 def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int) -> None:
+    # Publication switches: turn these off before charging money. NFL headshots are copyrighted, and
+    # ESPN's terms restrict commercial reuse of its data (the model can still use ESPN internally).
+    pub = {"show_headshots": True, "show_espn_fields": True, **cfg.get("publication", {})}
     WEB_DATA_DIR.mkdir(parents=True, exist_ok=True)
     pool = board.head(cfg["projection"]["export_pool_size"]).copy()
     hist = history(con, cfg, season)
@@ -488,16 +509,16 @@ def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int
         players.append({
             "id": r.player_id, "name": r.name, "pos": r.position, "team": r.team,
             "age": None if pd.isna(r.age_2027) else float(r.age_2027), "yearsExp": r.years_exp,
-            "college": r.college, "headshot": r.headshot_url, "rookie": bool(r.is_rookie),
+            "college": r.college, "headshot": r.headshot_url if pub["show_headshots"] else None, "rookie": bool(r.is_rookie),
             "draftTier": r.draft_capital_tier, "injury": r.injury_status, "injuryPart": r.injury_body_part,
             "flags": r.flags, "notes": r.notes,
             "g26": r.games_2026, "g25": r.games_2025, "tgtShare": r.target_share_2026,
             "touchShare": r.touch_share_2026, "s26": r.stats_2026,
             "projGames": r.proj_games, "proj": r.proj,
             "marketRank": None if pd.isna(r.market_rank) else int(r.market_rank),
-            "espnAdp": None if pd.isna(r.espn_adp) else round(float(r.espn_adp), 1),
-            "espnOwned": None if pd.isna(r.espn_owned) else round(float(r.espn_owned), 1),
-            "espnRos": r.espn_ros if isinstance(r.espn_ros, dict) else None,
+            "espnAdp": None if pd.isna(r.espn_adp) or not pub["show_espn_fields"] else round(float(r.espn_adp), 1),
+            "espnOwned": None if pd.isna(r.espn_owned) or not pub["show_espn_fields"] else round(float(r.espn_owned), 1),
+            "espnRos": r.espn_ros if isinstance(r.espn_ros, dict) and pub["show_espn_fields"] else None,
             "adpOverride": r.adp_override,
             # default-settings outputs (browser recomputes these for toggled settings)
             "rank": int(r.overall_rank), "posRank": int(r.pos_rank), "adp": float(r.adp), "tier": int(r.tier),
@@ -525,6 +546,7 @@ def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int
         "targetSeason": cfg["target_season"], "lastIngest": last_run[0] if last_run else None,
         "ingestNotes": last_run[1] if last_run else None, "replacement": {"points": rl["points"], "starters": rl["starters"]},
         "marketSource": rl.get("market_source", "sleeper"),
+        "publication": pub,
         "poolSize": len(players), "configHash": config_hash(cfg),
     }
     def write(name: str, obj) -> None:
