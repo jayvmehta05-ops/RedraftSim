@@ -36,11 +36,11 @@ function BackupRestore() {
         const k = localStorage.key(i);
         if (k && k.startsWith("redraft") && k !== ESPN_AUTH_KEY) data[k] = localStorage.getItem(k) ?? "";
       }
-      const blob = new Blob([JSON.stringify({ app: "redraft-sim", version: 1, exportedAt: new Date(stamp).toISOString(), data }, null, 1)],
+      const blob = new Blob([JSON.stringify({ app: "future-fantasy", version: 1, exportedAt: new Date(stamp).toISOString(), data }, null, 1)],
         { type: "application/json" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `redraft-sim-backup-${new Date(stamp).toISOString().slice(0, 10)}.json`;
+      a.download = `future-fantasy-backup-${new Date(stamp).toISOString().slice(0, 10)}.json`;
       a.click();
       URL.revokeObjectURL(a.href);
       setMsg(`Saved ${Object.keys(data).length} items to your downloads.`);
@@ -52,13 +52,13 @@ function BackupRestore() {
     if (!file) return;
     try {
       const parsed = JSON.parse(await file.text());
-      if (parsed?.app !== "redraft-sim" || typeof parsed.data !== "object") throw new Error("not a backup");
+      if (!["future-fantasy", "redraft-sim"].includes(parsed?.app) || typeof parsed.data !== "object") throw new Error("not a backup");
       const entries = Object.entries(parsed.data as Record<string, string>).filter(([k, v]) => k.startsWith("redraft") && typeof v === "string");
       entries.forEach(([k, v]) => localStorage.setItem(k, v));
       setMsg(`Restored ${entries.length} items. Reloading…`);
       setTimeout(() => window.location.reload(), 600);
     } catch {
-      setMsg("That file isn't a Redraft Sim backup.");
+      setMsg("That file isn't a Future Fantasy backup.");
     }
   };
   return (

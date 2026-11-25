@@ -33,7 +33,7 @@ from common import (  # noqa: E402
 SLEEPER = "https://api.sleeper.app/v1"
 NFLVERSE_WEEKLY = "https://github.com/nflverse/nflverse-data/releases/download/stats_player/stats_player_week_{season}.csv"
 ID_MAP_URL = "https://github.com/dynastyprocess/data/raw/master/files/db_playerids.csv"
-HEADERS = {"User-Agent": "redraft-sim-2027/1.0 (open-source fantasy projection pipeline)"}
+HEADERS = {"User-Agent": "future-fantasy/1.0 (open-source fantasy projection pipeline)"}
 
 NFLVERSE_COLS = {
     "attempts": "pass_att", "completions": "pass_cmp", "passing_yards": "pass_yds",

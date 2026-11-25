@@ -8,11 +8,11 @@ export const metadata: Metadata = { title: `Terms of Use — ${SITE_NAME}`, desc
 export default function TermsPage() {
   return (
     <LegalPage title="Terms of Use">
-      <p>Effective {EFFECTIVE_DATE}. By using Redraft Sim you agree to these terms.</p>
+      <p>Effective {EFFECTIVE_DATE}. By using Future Fantasy you agree to these terms.</p>
 
       <h2>What this is</h2>
       <p>
-        Redraft Sim is a fantasy football planning tool: projections, rankings, mock drafts, and trade, waiver and keeper helpers.
+        Future Fantasy is a fantasy football planning tool: projections, rankings, mock drafts, and trade, waiver and keeper helpers.
         It is for entertainment and planning in season-long fantasy leagues.
       </p>
 
@@ -25,7 +25,7 @@ export default function TermsPage() {
 
       <h2>Not affiliated</h2>
       <p>
-        Redraft Sim is independent and is not affiliated with, endorsed by or sponsored by the NFL, its teams or players, ESPN, Sleeper,
+        Future Fantasy is independent and is not affiliated with, endorsed by or sponsored by the NFL, its teams or players, ESPN, Sleeper,
         Yahoo or any other platform. Names and trademarks belong to their owners and are used only to identify players, teams and services.
       </p>
 

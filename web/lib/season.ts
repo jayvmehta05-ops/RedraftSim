@@ -10,4 +10,6 @@ export const SOURCE: number = season.source;
 export const PRIOR: number = season.prior;
 /** two-digit form, e.g. 27 */
 export const yy = (y: number) => String(y).slice(-2);
-export const SITE_NAME = `${TARGET} Redraft Sim`;
+export const SITE_NAME = "Future Fantasy";
+/** Public address of the site. Set NEXT_PUBLIC_SITE_URL in Vercel once a custom domain is connected. */
+export const SITE_URL = (process.env.NEXT_PUBLIC_SITE_URL || "https://redraftsim.vercel.app").replace(/\/$/, "");

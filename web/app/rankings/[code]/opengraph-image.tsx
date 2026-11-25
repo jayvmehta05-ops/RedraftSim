@@ -12,7 +12,7 @@ export default async function Image({ params }: { params: Promise<{ code: string
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", background: "#020617", color: "white", padding: 56, fontFamily: "sans-serif" }}>
         <div style={{ fontSize: 26, color: "#34d399", letterSpacing: 4 }}>{`POWER RANKINGS · ${(p?.h ?? "").toUpperCase()}`}</div>
-        <div style={{ fontSize: 56, fontWeight: 800, marginTop: 8 }}>{p?.lg ?? "Redraft Sim"}</div>
+        <div style={{ fontSize: 56, fontWeight: 800, marginTop: 8 }}>{p?.lg ?? "Future Fantasy"}</div>
         <div style={{ display: "flex", flexDirection: "column", marginTop: 28, gap: 10 }}>
           {rows.map(([name, rank, w, l, pts]) => (
             <div key={`${rank}`} style={{ display: "flex", alignItems: "center", fontSize: 34 }}>

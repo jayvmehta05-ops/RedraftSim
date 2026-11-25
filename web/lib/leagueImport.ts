@@ -5,6 +5,7 @@
  * (public leagues only; private ESPN leagues need the owner's login cookies, which we never ask for)
  * and normalizes it to this app's LeagueConfig shape.
  */
+import { SITE_URL } from "./season";
 import type { ImportedLeague, LeagueDraft, Scoring } from "./types";
 
 /** ESPN login cookies for private leagues. Passed straight through to ESPN; never stored or logged here. */
@@ -26,7 +27,7 @@ function cookieHeader(auth?: EspnAuth): Record<string, string> {
   return { Cookie: `espn_s2=${s2}; SWID=${swid}` };
 }
 
-const UA = { "User-Agent": "redraft-sim/1.0 (+https://redraftsim.vercel.app)" };
+const UA = { "User-Agent": `future-fantasy/1.0 (+${SITE_URL})` };
 const BASE_SCORING: Scoring = {
   pass_yd: 0.04, pass_td: 4, pass_int: -2, pass_2pt: 2, rush_yd: 0.1, rush_td: 6, rush_2pt: 2,
   rec: 1, rec_yd: 0.1, rec_td: 6, rec_2pt: 2, fum_lost: -2, te_premium: 0,

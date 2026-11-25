@@ -1,4 +1,4 @@
-# 2027 Fantasy Football Redraft Projections & Mock Draft Simulator
+# Future Fantasy: next-season fantasy football projections, mock drafts & league tools
 
 Self-updating 2027 redraft board for a **12-team, 1QB, Full PPR** league with the league rules in a config file. A Python
 pipeline pulls live 2026 NFL data every week, projects 2027 production, calculates VORP for your roster settings and

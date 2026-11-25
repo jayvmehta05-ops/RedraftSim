@@ -227,7 +227,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           <Link href="/" aria-label="Home" className="shrink-0"><Logo className="h-8 w-8" /></Link>
           <div className="min-w-0">
             <h1 className="truncate text-base font-bold leading-tight tracking-tight text-white sm:text-lg">
-              <span className="text-emerald-400">{TARGET}</span> Redraft Projections<span className="hidden sm:inline"> &amp; Mock Draft</span>
+              Future <span className="text-emerald-400">Fantasy</span><span className="ml-2 hidden rounded-md bg-emerald-500/10 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-500/30 sm:inline">{TARGET} board</span>
             </h1>
             <p className="truncate text-[11px] text-slate-500">
               Through {m.sourceSeason} Week {m.throughWeek} · updated {updated}<span className="hidden sm:inline"> · refreshes every Tuesday</span>

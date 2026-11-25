@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: `Privacy Policy — ${SITE_NAME}`, de
 export default function PrivacyPage() {
   return (
     <LegalPage title="Privacy Policy">
-      <p>Effective {EFFECTIVE_DATE}. This explains what Redraft Sim collects, why, and the choices you have.</p>
+      <p>Effective {EFFECTIVE_DATE}. This explains what Future Fantasy collects, why, and the choices you have.</p>
 
       <h2>The short version</h2>
       <ul>

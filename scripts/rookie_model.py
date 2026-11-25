@@ -35,7 +35,7 @@ COLS = {
     "targets": "targets", "receptions": "rec", "receiving_yards": "rec_yds", "receiving_tds": "rec_td",
     "receiving_2pt_conversions": "rec_2pt",
 }
-UA = {"User-Agent": "redraft-sim/1.0 (open-source fantasy projection pipeline)"}
+UA = {"User-Agent": "future-fantasy/1.0 (open-source fantasy projection pipeline)"}
 _cache: dict = {}
 
 

@@ -51,7 +51,7 @@ async function toGithub(f: Feedback) {
   const repo = process.env.FEEDBACK_GITHUB_REPO;
   const token = process.env.FEEDBACK_GITHUB_TOKEN;
   if (!repo || !token) return false;
-  const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "redraft-sim" };
+  const headers = { Authorization: `Bearer ${token}`, Accept: "application/vnd.github+json", "User-Agent": "future-fantasy" };
   const meta = await fetch(`https://api.github.com/repos/${repo}`, { headers });
   if (!meta.ok || !(await meta.json()).private) {
     console.warn("[feedback] FEEDBACK_GITHUB_REPO is not a private repo; refusing to post feedback there");

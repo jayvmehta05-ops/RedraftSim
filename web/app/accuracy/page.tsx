@@ -26,11 +26,11 @@ const bt = backtestJson as unknown as { generatedAt: string; poolDefinition: str
 
 export const metadata: Metadata = {
   title: `Projection accuracy — ${SITE_NAME}`,
-  description: "Out-of-sample backtest of the Redraft Sim projection model against ESPN preseason projections, ESPN rankings and a last-year baseline.",
+  description: "Out-of-sample backtest of the Future Fantasy projection model against ESPN preseason projections, ESPN rankings and a last-year baseline.",
 };
 
 const METHODS: { key: keyof Result["metrics"]; label: string }[] = [
-  { key: "model", label: "Redraft Sim model" },
+  { key: "model", label: "Future Fantasy model" },
   { key: "espn", label: "ESPN preseason projections" },
   { key: "espn_rank", label: "ESPN preseason PPR rankings" },
   { key: "naive", label: "Same as last year" },

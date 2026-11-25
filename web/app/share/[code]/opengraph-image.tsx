@@ -16,7 +16,7 @@ export default async function Image({ params }: { params: Promise<{ code: string
           <div style={{ fontSize: 28, color: "#34d399", letterSpacing: 4 }}>{`${TARGET} MOCK DRAFT`}</div>
           <div style={{ fontSize: 220, fontWeight: 900, lineHeight: 1 }}>{m?.g ?? "?"}</div>
           <div style={{ fontSize: 34, color: "#94a3b8", marginTop: 16 }}>
-            {m ? `Pick 1.${String(m.s).padStart(2, "0")} · #${m.r} of ${m.t}` : "Redraft Sim"}
+            {m ? `Pick 1.${String(m.s).padStart(2, "0")} · #${m.r} of ${m.t}` : "Future Fantasy"}
           </div>
           {m?.lg && <div style={{ fontSize: 26, color: "#64748b", marginTop: 8 }}>{m.lg}</div>}
         </div>
