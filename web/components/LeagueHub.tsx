@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } from "@/lib/refresh";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { SOURCE, TARGET } from "@/lib/season";
@@ -57,7 +57,7 @@ export default function LeagueHub(props: {
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [needsLogin, setNeedsLogin] = useState(false);
-  const [autoNote, setAutoNote] = useState<string | null>(null);
+  const [now, setNow] = useState(0); // for "updated N min ago"; set after mount so server and client HTML match
 
   const refresh = async (auth?: EspnAuth | null, auto = false) => {
     if (!league || league.provider === "manual") return;
@@ -68,7 +68,6 @@ export default function LeagueHub(props: {
     if (r.league) {
       onLeagueRefreshed(r.league);
       setNeedsLogin(false);
-      if (auto) setAutoNote("Rosters were more than 12 hours old, so they were refreshed automatically.");
     } else {
       setNeedsLogin(!!r.needsLogin);
       // A failed automatic refresh stays quiet unless ESPN needs a login
@@ -76,15 +75,35 @@ export default function LeagueHub(props: {
     }
   };
 
-  // Opening My League with stale rosters refreshes them in the background (from this browser)
+  // Keep rosters current: refresh in the background (from this browser) when they're more than a few minutes old,
+  // on opening My League, on coming back to the tab, and periodically while it's open.
+  const latest = useRef({ league, refreshing, refresh });
+  useEffect(() => { latest.current = { league, refreshing, refresh }; });
   const leagueId = league ? `${league.provider}:${league.leagueId}` : "";
   useEffect(() => {
-    if (!league || !isStale(league, Date.now())) return;
-    if (league.provider === "espn" && !savedEspnAuth()) return; // don't nag before the user tries a manual refresh
-    const t = setTimeout(() => refresh(null, true), 0);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const check = () => {
+      const { league: lg, refreshing: busy, refresh: run } = latest.current;
+      setNow(Date.now());
+      if (!lg || busy || document.visibilityState !== "visible" || !isStale(lg, Date.now())) return;
+      if (lg.provider === "espn" && !savedEspnAuth()) return; // don't nag before the user tries a manual refresh
+      void run(null, true);
+    };
+    const t = setTimeout(check, 0);
+    const every = setInterval(check, 60_000);
+    document.addEventListener("visibilitychange", check);
+    window.addEventListener("focus", check);
+    return () => {
+      clearTimeout(t);
+      clearInterval(every);
+      document.removeEventListener("visibilitychange", check);
+      window.removeEventListener("focus", check);
+    };
   }, [leagueId]);
+  const fetchedMs = league?.fetchedAt ? Date.parse(league.fetchedAt) : 0;
+  const ago = !now || !fetchedMs ? null : (() => {
+    const m = Math.max(0, Math.round((now - fetchedMs) / 60_000));
+    return m < 1 ? "just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} hr ago` : `${Math.round(m / 1440)} days ago`;
+  })();
   // Waivers and power rankings need rosters (and waivers needs your team); the Trades view walks users through that
   const ready = !!league?.rosters?.some((r) => r.playerIds.length || (r.manualIds ?? []).length);
   const sections: { id: Section; label: string; needsMe: boolean }[] = [
@@ -112,10 +131,14 @@ export default function LeagueHub(props: {
       {needsLogin && league?.provider === "espn" && (
         <EspnLogin busy={refreshing} error={refreshError && /rejected/i.test(refreshError) ? refreshError : null} onSubmit={(a, remember) => { if (remember) rememberEspnAuth(a); refresh(a); }} />
       )}
-      {autoNote && !needsLogin && (
-        <div className="flex items-center gap-2 rounded-lg bg-slate-900/70 px-3 py-2 text-xs text-slate-400 ring-1 ring-slate-800">
-          {autoNote}
-          <button onClick={() => setAutoNote(null)} className="ml-auto text-slate-500 hover:text-white" aria-label="Dismiss">✕</button>
+      {league && league.provider !== "manual" && !needsLogin && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          <span className={`h-1.5 w-1.5 rounded-full ${refreshing ? "animate-pulse bg-amber-400" : "bg-emerald-400"}`} aria-hidden />
+          {refreshing ? "Updating rosters…" : <>Rosters from {league.provider === "espn" ? "ESPN" : "Sleeper"} {ago ? `updated ${ago}` : ""} · auto-refresh every 10 min</>}
+          {!refreshing && (
+            <button onClick={() => refresh()} className="rounded-md px-2 py-0.5 font-semibold text-emerald-400 hover:bg-slate-900 hover:text-emerald-300">Refresh now</button>
+          )}
+          {refreshError && !refreshing && <span className="text-rose-300">{refreshError}</span>}
         </div>
       )}
       {offseason && (

@@ -5,7 +5,8 @@
 import type { ImportedLeague } from "./types";
 
 export const ESPN_AUTH_KEY = "redraft27.espnAuth";
-export const AUTO_REFRESH_MS = 12 * 60 * 60 * 1000;
+/** Rosters older than this refresh automatically (on opening My League, returning to the tab, and every so often). */
+export const AUTO_REFRESH_MS = 10 * 60 * 1000;
 
 export interface EspnAuth {
   espnS2: string;
