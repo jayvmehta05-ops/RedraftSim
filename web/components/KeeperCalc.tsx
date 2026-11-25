@@ -5,6 +5,7 @@ import type { LeagueConfig, RankedPlayer } from "@/lib/types";
 import { roundPick } from "@/lib/engine";
 import { teamPickIndices } from "@/lib/draft";
 import { PosBadge, TierBadge, fmt } from "./ui";
+import { IconKeeper } from "./icons";
 import { TARGET } from "@/lib/season";
 
 interface Keeper { id: string; round: number }
@@ -110,7 +111,11 @@ export default function KeeperCalc({ board, cfg }: { board: RankedPlayer[]; cfg:
 
       <div className="overflow-x-auto rounded-xl ring-1 ring-slate-800">
         {rows.length === 0 ? (
-          <p className="p-8 text-center text-sm text-slate-500">Add players on the left to compare keeper value.</p>
+          <div className="flex flex-col items-center justify-center gap-2 p-10 text-center">
+            <IconKeeper className="h-8 w-8 text-slate-600" />
+            <p className="text-sm font-medium text-slate-300">No keeper candidates yet</p>
+            <p className="max-w-xs text-xs text-slate-500">Add the players you could keep and the round each would cost. The best values get marked KEEP.</p>
+          </div>
         ) : (
           <table className="w-full min-w-[720px] text-sm">
             <thead className="bg-slate-900 text-[11px] uppercase tracking-wide text-slate-400">

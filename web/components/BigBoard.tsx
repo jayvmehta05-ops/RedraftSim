@@ -37,10 +37,34 @@ function Avatar({ p, size = 28 }: { p: RankedPlayer; size?: number }) {
   );
 }
 
+/** Horizontal bars: this season's actual PPG vs ESPN's rest-of-season view vs our next-season projection. */
+function PpgBars({ p }: { p: RankedPlayer }) {
+  const rows = [
+    { label: `${SOURCE} actual`, v: p.rookie || !p.g26 ? null : p.cur.ppg26, cls: "bg-slate-500" },
+    { label: `ESPN rest of ${SOURCE}`, v: p.cur.espnRosPpg, cls: "bg-sky-500/80" },
+    { label: `${TARGET} projection`, v: p.cur.ppg, cls: "bg-emerald-400" },
+  ].filter((r): r is { label: string; v: number; cls: string } => r.v != null && r.v > 0);
+  const max = Math.max(25, ...rows.map((r) => r.v));
+  return (
+    <div className="mb-3 space-y-1.5">
+      {rows.map((r) => (
+        <div key={r.label} className="flex items-center gap-2 text-[11px]">
+          <span className="w-28 shrink-0 text-slate-400">{r.label}</span>
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-800">
+            <div className={`h-full rounded-full ${r.cls}`} style={{ width: `${(r.v / max) * 100}%` }} />
+          </div>
+          <span className="w-9 text-right font-semibold tabular-nums text-slate-200">{fmt(r.v)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function PlayerDetail({ p }: { p: RankedPlayer }) {
   return (
     <div className="grid gap-3 md:grid-cols-[1fr_auto]">
       <div>
+        <PpgBars p={p} />
         <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
           {TARGET} projected per game · {fmt(p.projGames, 1)} games
         </div>
