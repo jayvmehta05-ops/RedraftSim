@@ -70,7 +70,7 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
           <div className="py-4">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Active league</h3>
             <p className="text-sm text-slate-300">
-              {cfg.teams} teams · {r.QB} QB · {r.RB} RB · {r.WR} WR · {r.TE} TE · {toggles.flexCount} FLEX · {r.BENCH} BN · {cfg.draft_rounds} rounds
+              {cfg.teams} teams · {r.QB} QB · {r.RB} RB · {r.WR} WR · {r.TE} TE · {toggles.flexCount} FLEX{r.K ? ` · ${r.K} K` : ""}{r.DST ? ` · ${r.DST} D/ST` : ""} · {r.BENCH} BN · {cfg.draft_rounds} rounds
             </p>
             <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Replacement level (season pts)</h3>
             <div className="grid grid-cols-4 gap-2 text-center">

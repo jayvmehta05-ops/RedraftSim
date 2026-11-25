@@ -1,16 +1,19 @@
 {
-  "league_name": "2027 Redraft Sim",
+  "league_name": "In The Pit",
+  "imported_from": "ESPN league settings, 2026 season (12-team H2H points, snake draft). K and D/ST slots are recorded but not projected; the mock draft reserves the final rounds for them.",
   "target_season": 2027,
   "source_season": 2026,
   "teams": 12,
-  "draft_rounds": 15,
+  "draft_rounds": 16,
   "roster": {
     "QB": 1,
     "RB": 2,
     "WR": 2,
     "TE": 1,
     "FLEX": 1,
-    "BENCH": 6
+    "K": 1,
+    "DST": 1,
+    "BENCH": 7
   },
   "flex_eligible": [
     "RB",

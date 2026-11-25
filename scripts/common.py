@@ -170,8 +170,12 @@ def load_config() -> dict:
 
 
 def config_hash(cfg: dict) -> str:
-    """Hash of the settings that change rankings (roster + scoring)."""
-    key = json.dumps({"teams": cfg["teams"], "roster": cfg["roster"], "scoring": cfg["scoring"]}, sort_keys=True)
+    """Hash of the settings that change rankings: teams, skill-position starters + FLEX, scoring.
+
+    Bench size and K / D/ST slots don't affect VORP, so changing them keeps the trend history.
+    """
+    roster = {k: cfg["roster"].get(k, 0) for k in ("QB", "RB", "WR", "TE", "FLEX")}
+    key = json.dumps({"teams": cfg["teams"], "roster": roster, "scoring": cfg["scoring"]}, sort_keys=True)
     return hashlib.sha1(key.encode()).hexdigest()[:10]
 
 

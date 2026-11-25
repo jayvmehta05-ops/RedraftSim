@@ -72,8 +72,10 @@ Edit `config/league_settings.json` to change the defaults (teams, roster, scorin
 toggles **1/2 FLEX**, **Full/Half PPR**, **4/6-pt passing TDs** and **TE Premium +0.5**. VORP, tiers, ADP and rankings are recalculated in the
 browser (`web/lib/engine.ts` mirrors the Python scoring step).
 
-Note: the default roster is 13 spots (1/2/2/1/1 + 6 BN) but `draft_rounds` is 15, so each team drafts 2 extra bench players.
-Set `draft_rounds` to 13 to match exactly.
+The defaults are imported from the ESPN league "In The Pit" (2026 settings): 12 teams, 1 QB / 2 RB / 2 WR / 1 TE / 1 FLEX / 1 K /
+1 D/ST, 7 bench, full PPR, 4-pt passing TDs, 16-round snake draft. Kickers and defenses aren't projected: the mock draft simulates
+the 14 skill-position rounds and reserves rounds 15–16 for K and D/ST. Bench size and K/D/ST slots don't affect VORP, so changing
+them keeps the weekly trend history.
 
 ## Mock draft bots (`web/lib/draft.ts`)
 

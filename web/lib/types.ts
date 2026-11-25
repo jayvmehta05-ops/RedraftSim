@@ -100,11 +100,13 @@ export interface Scoring {
 
 export interface LeagueConfig {
   league_name: string;
+  imported_from?: string;
   target_season: number;
   source_season: number;
   teams: number;
   draft_rounds: number;
-  roster: { QB: number; RB: number; WR: number; TE: number; FLEX: number; BENCH: number };
+  /** K and DST are drafted but not projected; the mock draft reserves its final rounds for them. */
+  roster: { QB: number; RB: number; WR: number; TE: number; FLEX: number; K?: number; DST?: number; BENCH: number };
   flex_eligible: Pos[];
   scoring: Scoring;
   projection: {

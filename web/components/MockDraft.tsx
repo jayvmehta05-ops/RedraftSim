@@ -28,7 +28,13 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
 
 export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: LeagueConfig }) {
   const teams = cfg.teams;
-  const rounds = cfg.draft_rounds;
+  // K and D/ST aren't projected: simulate the skill-position rounds and reserve the last rounds for them.
+  const reserved: { slot: string; n: number }[] = [
+    { slot: "K", n: cfg.roster.K ?? 0 },
+    { slot: "D/ST", n: cfg.roster.DST ?? 0 },
+  ].filter((x) => x.n > 0);
+  const reservedRounds = reserved.reduce((s, x) => s + x.n, 0);
+  const rounds = Math.max(1, cfg.draft_rounds - reservedRounds);
   const total = teams * rounds;
 
   const [rawPhase, setPhase] = useState<Phase>("setup");
@@ -135,8 +141,9 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
       <section className="mx-auto max-w-3xl rounded-2xl bg-slate-900 p-6 ring-1 ring-slate-800">
         <h2 className="text-lg font-semibold text-white">12-Team Mock Draft Room</h2>
         <p className="mt-1 text-sm text-slate-400">
-          {rounds}-round snake draft vs. {teams - 1} AI bots drafting from the live 2027 ADP + VORP board with roster-need logic for
+          {cfg.draft_rounds}-round snake draft vs. {teams - 1} AI bots drafting from the live 2027 ADP + VORP board with roster-need logic for
           {" "}{cfg.roster.QB} QB · {cfg.roster.RB} RB · {cfg.roster.WR} WR · {cfg.roster.TE} TE · {cfg.roster.FLEX} FLEX.
+          {reservedRounds > 0 && ` Rounds ${rounds + 1}–${cfg.draft_rounds} are reserved for ${reserved.map((x) => x.slot).join(" and ")} (not projected).`}
         </p>
         <h3 className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-slate-400">Your draft slot</h3>
         <div className="grid grid-cols-6 gap-2 sm:grid-cols-12">
@@ -299,6 +306,12 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
                 ) : <span className="flex-1 text-slate-600">—</span>}
               </div>
             ))}
+            {reserved.flatMap((x) => Array.from({ length: x.n }, () => x.slot)).map((slot, i) => (
+              <div key={`r${i}`} className="flex items-center gap-2 rounded-md bg-slate-800/30 px-2 py-1.5 text-sm" title="Drafted in the reserved final rounds; not projected">
+                <span className="w-10 text-[11px] font-semibold text-slate-500">{slot}</span>
+                <span className="flex-1 text-xs text-slate-600">Late-round pick (not projected)</span>
+              </div>
+            ))}
             {Array.from({ length: Math.max(rounds - myLineup.slots.length, myLineup.bench.length) }, (_, i) => myLineup.bench[i]).map((p, i) => (
               <div key={`b${i}`} className="flex items-center gap-2 rounded-md px-2 py-1 text-sm">
                 <span className="w-10 text-[11px] font-semibold text-slate-600">BN</span>
@@ -350,6 +363,14 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
               })}
             </div>
           ))}
+          {reservedRounds > 0 && (
+            <>
+              <div className="flex items-center justify-center border-t border-slate-800 bg-slate-900 text-[10px] text-slate-500">R{rounds + 1}{reservedRounds > 1 ? `–${cfg.draft_rounds}` : ""}</div>
+              <div className="border-l border-t border-slate-800 px-2 py-2 text-[11px] text-slate-500" style={{ gridColumn: `span ${teams}` }}>
+                Reserved for {reserved.map((x) => x.slot).join(" and ")}: every team fills these slots late; kickers and defenses aren&apos;t projected.
+              </div>
+            </>
+          )}
         </div>
       </div>
     </section>
