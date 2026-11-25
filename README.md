@@ -214,3 +214,14 @@ Your local edits always win.
 Import the repo and leave **Root Directory empty** (the repo root). Vercel reads the root `vercel.json`, which declares one
 Services entry, `web` (the Next.js app in `web/`), serving every path. Setting Root Directory to `web` makes Vercel look for
 `web/vercel.json` instead and fail with "no services are declared". The page is fully static: data is baked in at build time.
+
+### Custom domain
+
+Live at **https://fantasy.jay-builds.com** (Cloudflare DNS: CNAME `fantasy` → the `*.vercel-dns-*.com` target Vercel shows,
+proxy **off**/DNS only so Vercel can issue the certificate). The old `redraftsim.vercel.app` address keeps working.
+
+- Vercel env `NEXT_PUBLIC_SITE_URL=https://fantasy.jay-builds.com` drives the sitemap, robots.txt, link-preview URLs and
+  metadata. It's inlined at build time, so redeploy after changing it.
+- Supabase → Authentication → URL Configuration: Site URL is the new domain; Redirect URLs allow
+  `https://fantasy.jay-builds.com/**` and `https://redraftsim.vercel.app/**`.
+- Google Cloud OAuth consent screen: add `jay-builds.com` to authorized domains and publish the app so anyone can sign in.
