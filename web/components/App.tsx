@@ -11,7 +11,7 @@ import LeagueEditor from "./LeagueEditor";
 import FeedbackButton from "./Feedback";
 import KeeperCalc from "./KeeperCalc";
 import LiveDraft from "./LiveDraft";
-import MockDraft from "./MockDraft";
+import DraftHub from "./DraftHub";
 import SettingsDrawer from "./SettingsDrawer";
 import LeagueHub from "./LeagueHub";
 import TrendTracker from "./TrendTracker";
@@ -204,7 +204,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} />
         )}
         {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} showEspn={m.publication?.show_espn_fields !== false} />}
-        {tab === "mock" && <MockDraft board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} onOpenEditor={() => setEditorOpen(true)} />}
+        {tab === "mock" && <DraftHub board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} onOpenEditor={() => setEditorOpen(true)} />}
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
         {tab === "trades" && (
           <LeagueHub board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}

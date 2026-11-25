@@ -52,6 +52,16 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
     tip: "When you're on the clock, the Next column shows each player's chance of still being there at your next pick (150 simulated drafts). If your target is 80%+ to come back, take someone else now.",
   },
   {
+    title: "Draft strategy lab",
+    what: "Which plan works best from your draft slot? The lab runs full simulated drafts with your team following each strategy, against the same bots (or your leaguemates), and compares the starting lineups they produce.",
+    how: [
+      "Open Mock Draft → Strategy lab, pick your slot and how many drafts to run per strategy (30, 60 or 120).",
+      "Strategies: best available, Zero RB, Hero RB, Robust RB, WR-heavy, early elite QB, late QB and early elite TE.",
+      "Every strategy faces identical opponents and luck, so differences come from the strategy. You get average starter points, average finish, top-3 rate, the typical opening and the usual first pick.",
+    ],
+    tip: "Run it from your real draft slot against your leaguemates. Differences of a few points are noise; 20+ points is a real edge.",
+  },
+  {
     title: "Live Draft",
     what: "Help during your real draft. Picks disappear from the board as they happen and you get ranked suggestions for your next pick.",
     how: [
