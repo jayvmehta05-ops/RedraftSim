@@ -198,7 +198,10 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   const { board, replacement } = useMemo(() => computeBoard(data.players, cfg), [data.players, cfg]);
   const nonDefault = !sameToggles(toggles, defaults);
   const m = data.meta;
-  const updated = m.lastIngest ? new Date(m.lastIngest).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
+  // Fixed locale + UTC so the server-rendered HTML and the browser produce the same text (no hydration mismatch)
+  const updated = m.lastIngest
+    ? new Date(m.lastIngest).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" })
+    : "—";
 
   const chips = [
     ...(league ? [league.name] : []),
