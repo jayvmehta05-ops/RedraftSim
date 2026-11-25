@@ -117,6 +117,24 @@ backtest deliberately leaves out. A grid search over the main model knobs (prior
 availability weight) moved results by less than 0.01, so the gap is about missing inputs, not tuning. ESPN's archive has empty
 2023 projections, so 2023 can't be compared.
 
+## Feedback loop
+
+A floating **Feedback** button (0–10 recommend score, category, comment, optional email) and a one-tap "how realistic were
+the bots?" rating after each mock draft post to `/api/feedback`. Connect at least one private destination in Vercel →
+Project → Settings → Environment Variables, then redeploy:
+
+- `FEEDBACK_WEBHOOK_URL` (+ optional `FEEDBACK_WEBHOOK_KIND=slack`): a Discord or Slack incoming webhook for a private channel. Easiest.
+- `FEEDBACK_GITHUB_REPO` + `FEEDBACK_GITHUB_TOKEN`: files feedback as issues in a **private** repo (fine-grained token, Issues read/write
+  on that repo only). The route refuses to post to a public repo, because this repo is public and feedback can include emails.
+
+Without a destination, feedback only lands in Vercel's runtime logs, which Hobby plans keep for a short time.
+
+## Private ESPN leagues
+
+ESPN has no third-party sign-in, so private leagues use the viewer's own `espn_s2` and `SWID` cookies. They're sent in a POST body
+(never a URL), forwarded to ESPN for that one request, and never stored or logged server-side; the browser keeps them only if the
+user ticks "Remember on this device".
+
 ## Before charging money
 
 Set `publication.show_headshots` and `publication.show_espn_fields` to `false` in `config/league_settings.json`: NFL headshots

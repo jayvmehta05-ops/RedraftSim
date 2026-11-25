@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { ImportedLeague, LeagueConfig, Replacement, Toggles } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
 
@@ -18,18 +18,53 @@ interface Props {
   onChooseManager: (id: string | null) => void;
 }
 
+const ESPN_AUTH_KEY = "redraft27.espnAuth";
+
 function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Props, "league" | "onImport" | "myManager" | "onChooseManager">) {
   const [provider, setProvider] = useState<"sleeper" | "espn">("sleeper");
   const [id, setId] = useState("");
   const [season, setSeason] = useState(2026);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPrivate, setShowPrivate] = useState(false);
+  const [espnS2, setEspnS2] = useState("");
+  const [swid, setSwid] = useState("");
+  const [remember, setRemember] = useState(false);
+
+  // ESPN cookies stay in this browser only (and only if the user asks us to remember them).
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ESPN_AUTH_KEY) ?? "null");
+      if (saved?.espnS2) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setEspnS2(saved.espnS2);
+        setSwid(saved.swid ?? "");
+        setRemember(true);
+      }
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
 
   const run = async () => {
     setBusy(true);
     setError(null);
+    const usePrivate = provider === "espn" && espnS2.trim() && swid.trim();
     try {
-      const r = await fetch(`/api/league?provider=${provider}&id=${encodeURIComponent(id.trim())}&season=${season}`);
+      if (usePrivate && remember) localStorage.setItem(ESPN_AUTH_KEY, JSON.stringify({ espnS2: espnS2.trim(), swid: swid.trim() }));
+      if (!remember) localStorage.removeItem(ESPN_AUTH_KEY);
+    } catch {
+      /* ignore */
+    }
+    try {
+      const r = await fetch("/api/league", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          provider, id: id.trim(), season,
+          ...(usePrivate ? { espnS2: espnS2.trim(), swid: swid.trim() } : {}),
+        }),
+      });
       const body = await r.json();
       if (!r.ok) throw new Error(body.error ?? `Import failed (${r.status})`);
       onImport(body as ImportedLeague);
@@ -99,6 +134,34 @@ function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Pro
         className="mt-2 w-full rounded-lg bg-emerald-500 py-2 text-sm font-bold text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">
         {busy ? "Importing…" : "Import league"}
       </button>
+      {provider === "espn" && (
+        <div className="mt-2">
+          <button onClick={() => setShowPrivate((v) => !v)} className="text-xs text-emerald-400 hover:underline">
+            {showPrivate ? "▾" : "▸"} Private league? Use your ESPN login
+          </button>
+          {showPrivate && (
+            <div className="mt-2 space-y-2 rounded-lg bg-slate-800/50 p-3 text-[11px] text-slate-400">
+              <p>
+                ESPN doesn&apos;t offer &quot;Sign in with ESPN&quot; to other sites, so private leagues need two cookies from your
+                own logged-in browser. On a computer: open <b>fantasy.espn.com</b> while logged in → press F12 → Application
+                (Chrome) or Storage (Firefox) → Cookies → espn.com → copy <b>espn_s2</b> and <b>SWID</b>.
+              </p>
+              <input value={espnS2} onChange={(e) => setEspnS2(e.target.value)} placeholder="espn_s2" type="password" autoComplete="off"
+                className="w-full rounded-md bg-slate-900 px-2 py-1.5 text-xs text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
+              <input value={swid} onChange={(e) => setSwid(e.target.value)} placeholder="SWID, like {XXXXXXXX-XXXX-...}" autoComplete="off"
+                className="w-full rounded-md bg-slate-900 px-2 py-1.5 text-xs text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
+              <label className="flex items-center gap-2">
+                <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="accent-emerald-500" />
+                Remember on this device (stored only in this browser)
+              </label>
+              <p className="text-slate-500">
+                These cookies are sent to ESPN once to read your league and are never stored on our server. They work like a
+                password for your ESPN account: only paste them here on your own device, and log out of ESPN to revoke them.
+              </p>
+            </div>
+          )}
+        </div>
+      )}
       {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
     </div>
   );

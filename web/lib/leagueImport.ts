@@ -7,6 +7,25 @@
  */
 import type { ImportedLeague, LeagueDraft, Scoring } from "./types";
 
+/** ESPN login cookies for private leagues. Passed straight through to ESPN; never stored or logged here. */
+export interface EspnAuth {
+  espnS2: string;
+  swid: string;
+}
+
+function cookieHeader(auth?: EspnAuth): Record<string, string> {
+  if (!auth?.espnS2 || !auth?.swid) return {};
+  const clean = (v: string) => v.trim().replace(/^"|"$/g, "");
+  const s2 = clean(auth.espnS2);
+  let swid = clean(auth.swid);
+  if (!swid.startsWith("{")) swid = `{${swid}}`;
+  // Reject anything that could inject extra headers or cookies
+  if (!/^[A-Za-z0-9%+/=_.-]{20,2000}$/.test(s2) || !/^\{[0-9A-Fa-f-]{36}\}$/.test(swid)) {
+    throw new ImportError("Those ESPN cookie values don't look right. Copy espn_s2 and SWID exactly as shown.");
+  }
+  return { Cookie: `espn_s2=${s2}; SWID=${swid}` };
+}
+
 const UA = { "User-Agent": "redraft-sim/1.0 (+https://redraftsim.vercel.app)" };
 const BASE_SCORING: Scoring = {
   pass_yd: 0.04, pass_td: 4, pass_int: -2, pass_2pt: 2, rush_yd: 0.1, rush_td: 6, rush_2pt: 2,
@@ -147,16 +166,17 @@ const ESPN_SCORING: Record<number, keyof Scoring> = {
 };
 const ESPN_POS: Record<number, string> = { 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF" };
 
-async function importEspn(id: string, season: number): Promise<ImportedLeague> {
+async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<ImportedLeague> {
   const base = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${encodeURIComponent(id)}`;
   let lg: EspnLeague;
   try {
-    lg = await getJson<EspnLeague>(`${base}?view=mSettings&view=mTeam&view=mDraftDetail`);
+    lg = await getJson<EspnLeague>(`${base}?view=mSettings&view=mTeam&view=mDraftDetail`, { headers: cookieHeader(auth) });
   } catch (e) {
     if (e instanceof ImportError && e.message === "PRIVATE") {
-      throw new ImportError(
-        "This ESPN league is private. Ask your commissioner to turn on \"Make league viewable to public\" " +
-        "(League Settings → Basic Settings), or set your scoring with the toggles below.", 403);
+      throw new ImportError(auth?.espnS2
+        ? "ESPN rejected those cookies. They expire when you log out of ESPN; log in again and copy fresh values."
+        : "This ESPN league is private. Open \"Private league?\" below and paste your ESPN login cookies, or ask your " +
+          "commissioner to turn on \"Make league viewable to public\".", 403);
     }
     throw e;
   }
@@ -217,9 +237,9 @@ async function importEspn(id: string, season: number): Promise<ImportedLeague> {
   };
 }
 
-export async function importLeague(provider: string, id: string, season: number): Promise<ImportedLeague> {
+export async function importLeague(provider: string, id: string, season: number, auth?: EspnAuth): Promise<ImportedLeague> {
   if (!/^[A-Za-z0-9_-]{3,40}$/.test(id)) throw new ImportError("That doesn't look like a league ID.");
   if (provider === "sleeper") return importSleeper(id);
-  if (provider === "espn") return importEspn(id, season);
+  if (provider === "espn") return importEspn(id, season, auth);
   throw new ImportError("Supported platforms: Sleeper and ESPN.");
 }

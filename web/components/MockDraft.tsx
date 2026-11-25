@@ -10,6 +10,7 @@ import {
 } from "@/lib/draft";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { encodeMock } from "@/lib/share";
+import { MockSurvey } from "./Feedback";
 import { Flags, POS_CELL, PosBadge, TierBadge, fmt } from "./ui";
 
 type Phase = "setup" | "live" | "done";
@@ -277,6 +278,9 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
         </div>
       </div>
 
+      {phase === "done" && (
+        <MockSurvey context={{ opponents: locked?.leagueName ? "leaguemates" : "personalities", teams: String(teams), slot: String(userTeam + 1) }} />
+      )}
       {phase === "done" && (
         <div className="overflow-x-auto rounded-xl ring-1 ring-slate-800">
           <table className="w-full min-w-[640px] text-sm">

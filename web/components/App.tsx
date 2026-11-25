@@ -5,6 +5,7 @@ import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
 import { buildLeaguemateBots } from "@/lib/leaguemates";
 import BigBoard from "./BigBoard";
+import FeedbackButton from "./Feedback";
 import KeeperCalc from "./KeeperCalc";
 import LiveDraft from "./LiveDraft";
 import MockDraft from "./MockDraft";
@@ -157,6 +158,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
       <footer className="mx-auto max-w-7xl px-4 pb-8 text-[11px] leading-relaxed text-slate-600">
         <div className="mb-2 flex gap-4 text-xs">
+          <a href="/guide" className="text-emerald-400/80 hover:text-emerald-300">How it works</a>
           <a href="/accuracy" className="text-emerald-400/80 hover:text-emerald-300">How accurate are these projections?</a>
           <a href="/risers" className="text-emerald-400/80 hover:text-emerald-300">This week&apos;s risers &amp; fallers</a>
         </div>
@@ -166,6 +168,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         editable data/rookies_2027.csv. Projections are model estimates, not guarantees.
       </footer>
 
+      <FeedbackButton context={{ tab, league: league ? league.provider : "none" }} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} toggles={toggles} defaults={defaults}
         onChange={updateToggles} cfg={cfg} replacement={replacement}
         league={league} onImport={importLeague} myManager={myManager} onChooseManager={chooseManager} />
