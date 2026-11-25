@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import backtestJson from "@/data/backtest.json";
 import { SITE_NAME, TARGET } from "@/lib/season";
+import PageHeader from "@/components/PageHeader";
 
 interface MethodMetrics {
   n: number;
@@ -46,8 +46,9 @@ function Cell({ v, b, d = 2 }: { v: number | null; b: number; d?: number }) {
 
 export default function AccuracyPage() {
   return (
+    <>
+    <PageHeader />
     <main className="mx-auto max-w-5xl px-4 py-8 text-slate-200">
-      <Link href="/" className="text-sm text-emerald-400 hover:underline">← {SITE_NAME}</Link>
       <h1 className="mt-3 text-2xl font-bold text-white">How accurate are the projections?</h1>
       <p className="mt-2 max-w-3xl text-sm leading-relaxed text-slate-400">
         Each season below was projected using only the two seasons before it, with the same engine that builds the {TARGET} board,
@@ -109,5 +110,6 @@ export default function AccuracyPage() {
       ))}
       <p className="mt-8 text-xs text-slate-500">Top-N columns: share of each method&apos;s top-N at the position who actually finished top-N. Backtest generated {new Date(bt.generatedAt).toLocaleDateString()}.</p>
     </main>
+    </>
   );
 }

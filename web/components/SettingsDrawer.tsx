@@ -252,7 +252,7 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
             onClick={() => onChange(defaults)}
             className="w-full rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
           >
-            {league ? `Reset to ${league.name} settings` : "Reset to league_settings.json defaults"}
+            {league ? `Reset to ${league.name} settings` : "Reset to site defaults"}
           </button>
         </div>
       </aside>

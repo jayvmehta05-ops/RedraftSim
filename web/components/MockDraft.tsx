@@ -198,12 +198,20 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
             </div>
           )}
           <div className="mb-1 font-semibold text-slate-300">Your opponents</div>
-          {(leagueMode ? opponents : BOT_PROFILES).map((b) => <span key={b.name} className="mr-3 inline-block">{b.name} <span className="text-slate-500">— {b.style}</span></span>)}
+          <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
+            {(leagueMode ? opponents : BOT_PROFILES).map((b) => (
+              <div key={b.name} className="rounded-md bg-slate-900/70 px-2 py-1.5" title={b.style}>
+                <div className="truncate text-[12px] font-medium text-slate-200">{b.name}</div>
+                <div className="truncate text-[10px] text-slate-500">{b.style}</div>
+              </div>
+            ))}
+          </div>
           {leagueMode && !myManager && (
             <p className="mt-2 text-amber-300/80">Tip: pick your own team in Settings → Your league so you aren&apos;t also drafting against yourself.</p>
           )}
         </div>
-        <button onClick={(e) => start(slot, e.timeStamp + performance.timeOrigin)} className="mt-6 w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400">
+        <button onClick={(e) => start(slot, e.timeStamp + performance.timeOrigin)}
+          className="sticky bottom-20 mt-6 w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-slate-950/60 hover:bg-emerald-400 lg:static lg:shadow-none">
           Start mock draft from 1.{String(slot).padStart(2, "0")}
         </button>
       </section>

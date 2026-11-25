@@ -10,7 +10,23 @@
 }
 
 body {
-  background: #020617;
+  background:
+    radial-gradient(1200px 500px at 15% -10%, rgba(16, 185, 129, 0.08), transparent 60%),
+    radial-gradient(900px 400px at 100% 0%, rgba(56, 189, 248, 0.05), transparent 60%),
+    #020617;
+  background-attachment: fixed;
   color: #e2e8f0;
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Visible keyboard focus everywhere, invisible for mouse clicks */
+:focus-visible {
+  outline: 2px solid #34d399;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Hide scrollbars on horizontally scrolling chip rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
 }

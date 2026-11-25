@@ -4,6 +4,7 @@ import boardJson from "@/data/board.json";
 import trendsJson from "@/data/trends.json";
 import type { BoardData, TrendData } from "@/lib/types";
 import { SITE_NAME, TARGET } from "@/lib/season";
+import PageHeader from "@/components/PageHeader";
 
 const board = boardJson as unknown as BoardData;
 const trends = trendsJson as unknown as TrendData;
@@ -55,8 +56,9 @@ function List({ title, rows, up }: { title: string; rows: ReturnType<typeof move
 export default function RisersPage() {
   const { risers, fallers } = movers();
   return (
+    <>
+    <PageHeader />
     <main className="mx-auto max-w-5xl px-4 py-8 text-slate-200">
-      <Link href="/" className="text-sm text-emerald-400 hover:underline">← {SITE_NAME}</Link>
       <h1 className="mt-3 text-2xl font-bold text-white">{TARGET} fantasy risers &amp; fallers after Week {week}</h1>
       <p className="mt-2 max-w-3xl text-sm text-slate-400">
         Biggest week-over-week moves in projected {TARGET} redraft ADP (12-team, full PPR) after {board.meta.sourceSeason} Week {week}.
@@ -68,5 +70,6 @@ export default function RisersPage() {
       </div>
       <p className="mt-6 text-sm"><Link href="/" className="text-emerald-400 hover:underline">See the full {TARGET} big board and run a mock draft →</Link></p>
     </main>
+    </>
   );
 }

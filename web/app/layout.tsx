@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SITE_NAME, TARGET } from "@/lib/season";
@@ -18,13 +18,17 @@ export const metadata: Metadata = {
   description: `Self-updating ${TARGET} fantasy football redraft projections, VORP big board and 12-team mock draft simulator.`,
 };
 
+export const viewport: Viewport = {
+  themeColor: "#020617",
+};
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full bg-slate-950">{children}</body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

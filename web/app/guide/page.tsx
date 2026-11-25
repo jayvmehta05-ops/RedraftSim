@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { SITE_NAME, TARGET } from "@/lib/season";
+import PageHeader from "@/components/PageHeader";
 
 export const metadata: Metadata = {
   title: `How it works — ${SITE_NAME}`,
@@ -71,8 +72,9 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
 
 export default function GuidePage() {
   return (
+    <>
+    <PageHeader />
     <main className="mx-auto max-w-3xl px-4 py-8 text-slate-200">
-      <Link href="/" className="text-sm text-emerald-400 hover:underline">← {SITE_NAME}</Link>
       <h1 className="mt-3 text-2xl font-bold text-white">How it works</h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-400">
         {SITE_NAME} projects next season for redraft fantasy football and gives you tools to plan your draft: a big board
@@ -101,5 +103,6 @@ export default function GuidePage() {
         Questions or ideas? Use the <b>Feedback</b> button on the main page. <Link href="/" className="text-emerald-400 hover:underline">Back to the board →</Link>
       </p>
     </main>
+    </>
   );
 }

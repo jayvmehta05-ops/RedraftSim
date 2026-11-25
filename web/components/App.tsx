@@ -125,7 +125,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
+    <div className="min-h-screen text-slate-200">
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
           <Logo className="h-8 w-8 shrink-0" />
@@ -153,7 +153,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           </button>
         </div>
         <div className="mx-auto max-w-7xl px-4 pb-2.5">
-          <button onClick={() => setSettingsOpen(true)} className="-mx-1 flex max-w-full gap-1.5 overflow-x-auto px-1 [scrollbar-width:none]" aria-label="Edit league settings">
+          <button onClick={() => setSettingsOpen(true)} className="no-scrollbar -mx-1 flex max-w-full gap-1.5 overflow-x-auto px-1 [scrollbar-width:none]" aria-label="Edit league settings">
             {chips.map((c, i) => (
               <span key={c} className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] ring-1 ${i === 0 && league ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30" : "bg-slate-900 text-slate-300 ring-slate-800"}`}>{c}</span>
             ))}
