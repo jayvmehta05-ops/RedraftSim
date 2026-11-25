@@ -50,3 +50,19 @@ $$;
 drop trigger if exists user_store_touch on public.user_store;
 create trigger user_store_touch before update on public.user_store
   for each row execute function public.touch_user_store();
+
+-- ---------------------------------------------------------------------------------------------
+-- Waitlist: emails from the home page sign-up. Anyone can add their email; nobody can read the
+-- list through the API (read it in the Supabase dashboard: Table Editor -> waitlist).
+create table if not exists public.waitlist (
+  id         bigint generated always as identity primary key,
+  email      text        not null unique,
+  source     text,
+  created_at timestamptz not null default now(),
+  constraint waitlist_email_format check (char_length(email) <= 254 and email ~* '^[^@\s]+@[^@\s]+\.[^@\s]+$'),
+  constraint waitlist_source_len check (source is null or char_length(source) <= 40)
+);
+alter table public.waitlist enable row level security;
+drop policy if exists "anyone can join" on public.waitlist;
+create policy "anyone can join" on public.waitlist for insert to anon, authenticated with check (true);
+grant insert on public.waitlist to anon, authenticated;

@@ -217,5 +217,7 @@ export interface ImportedLeague {
     tradeDeadlineWeek?: number | null;
     /** trade deadline as a timestamp in ms (ESPN) */
     tradeDeadlineAt?: number | null;
+    /** how many teams make the playoffs */
+    playoffTeams?: number;
   };
 }

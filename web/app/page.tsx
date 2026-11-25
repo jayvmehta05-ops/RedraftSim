@@ -7,6 +7,7 @@ import Counters from "@/components/landing/Counters";
 import FeatureTour from "@/components/landing/FeatureTour";
 import HeroHeadline from "@/components/landing/HeroHeadline";
 import TopCard, { type TopRow } from "@/components/landing/TopCard";
+import Waitlist from "@/components/landing/Waitlist";
 import { thumb } from "@/components/ui";
 import boardJson from "@/data/board.json";
 import { SITE_NAME, SOURCE, TARGET } from "@/lib/season";
@@ -65,6 +66,7 @@ export default function Landing() {
           <nav className="ml-auto hidden items-center gap-1 text-sm font-semibold md:flex">
             <a href="#tour" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">Features</a>
             <Link href="/accuracy" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">Accuracy</Link>
+            <a href="#waitlist" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">Waitlist</a>
             <a href="#faq" className="rounded-md px-3 py-2 text-slate-400 hover:bg-slate-900 hover:text-white">FAQ</a>
           </nav>
           <div className="ml-auto flex items-center gap-2 md:ml-2">
@@ -183,6 +185,32 @@ export default function Landing() {
                 </Link>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* Waitlist */}
+        <section id="waitlist" className="relative scroll-mt-20 overflow-hidden border-t border-slate-800/70">
+          <div aria-hidden className="ff-float-2 pointer-events-none absolute -right-24 top-10 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
+          <div className="relative mx-auto max-w-4xl px-4 py-16 text-center md:py-20">
+            <div className="inline-flex items-center gap-2 rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300 ring-1 ring-cyan-500/30">
+              <span className="ff-blink h-1.5 w-1.5 rounded-full bg-cyan-300" /> Coming next
+            </div>
+            <h2 className="mt-4 text-2xl font-bold tracking-tight text-white sm:text-3xl">Be first in line for what&apos;s next</h2>
+            <p className="mx-auto mt-2 max-w-xl text-slate-400">Join the waitlist and we&apos;ll email you when these land. Early sign-ups get first access.</p>
+            <div className="mx-auto mt-8 grid max-w-3xl gap-2 text-left sm:grid-cols-2">
+              {[
+                ["Weekly game plan email", "Your start/sit calls, waiver targets and trade ideas every Tuesday."],
+                ["Phone app", "Add Future Fantasy to your home screen, with alerts when news hits your players."],
+                ["Yahoo leagues", "Import Yahoo leagues like Sleeper and ESPN today."],
+                ["Pro tools", "Deeper league history, draft report cards and shareable cards for the group chat."],
+              ].map(([t, b]) => (
+                <div key={t} className="rounded-xl bg-slate-900/60 p-3 ring-1 ring-slate-800">
+                  <div className="text-sm font-semibold text-white">{t}</div>
+                  <div className="mt-0.5 text-xs text-slate-400">{b}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-8"><Waitlist source="home" /></div>
           </div>
         </section>
 

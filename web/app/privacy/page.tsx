@@ -22,6 +22,7 @@ export default function PrivacyPage() {
       <ul>
         <li><b>If you sign in with Google:</b> your name, email address and profile picture from Google, used to show who&apos;s signed in and to keep your data separate from everyone else&apos;s.</li>
         <li><b>Your saved app data (signed-in users only):</b> imported leagues (team names, rosters, records, past draft picks), your descriptions of leaguemates, roster edits, keeper lists and settings, so they sync between your devices.</li>
+        <li><b>Waitlist:</b> if you join the waitlist, your email address, stored so we can tell you about new features. Ask through the Feedback button to be removed.</li>
         <li><b>Feedback you send:</b> your message, rating and, only if you choose to give it, your email address so we can reply.</li>
         <li><b>Error reports:</b> when something breaks, the error message, the page, screen width and browser type, to fix bugs. No personal data is included.</li>
         <li><b>Usage analytics (if enabled):</b> anonymous page views via Vercel Web Analytics, which uses no cookies.</li>

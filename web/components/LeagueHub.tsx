@@ -8,12 +8,13 @@ import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import LuckMeter from "./LuckMeter";
 import MyTeam from "./MyTeam";
+import PlayoffOdds from "./PlayoffOdds";
 import StartSit from "./StartSit";
 import PowerRankings from "./PowerRankings";
 import TradeAssistant from "./TradeAssistant";
 import Waivers from "./Waivers";
 
-type Section = "team" | "startsit" | "trades" | "waivers" | "power" | "luck";
+type Section = "team" | "startsit" | "trades" | "waivers" | "power" | "odds" | "luck";
 
 /** Shown when ESPN needs fresh login cookies for a private league; retries the refresh on submit. */
 function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember: boolean) => void; busy: boolean; error: string | null }) {
@@ -122,6 +123,7 @@ export default function LeagueHub(props: {
     { id: "trades", label: "Trades", needsMe: true },
     { id: "waivers", label: "Waivers", needsMe: true },
     { id: "power", label: "Power rankings", needsMe: false },
+    { id: "odds", label: "Playoff odds", needsMe: false },
     { id: "luck", label: "Luck meter", needsMe: false },
   ];
   const phase = seasonPhase(props.throughWeek, league, now);
@@ -182,6 +184,9 @@ export default function LeagueHub(props: {
       )}
       {!offseason && section === "waivers" && !blocked && league && myManager && (
         <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={weeksLeft} keeper={props.keeper} />
+      )}
+      {!offseason && section === "odds" && !blocked && league && (
+        <PlayoffOdds board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={weeksLeft} onRefresh={() => refresh()} refreshing={refreshing} />
       )}
       {section === "luck" && !blocked && league && (
         <LuckMeter league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />
