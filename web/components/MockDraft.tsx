@@ -10,6 +10,7 @@ import {
 } from "@/lib/draft";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { encodeMock } from "@/lib/share";
+import { draftReplay, pickReaction, simulateAvailability, tierCountdown } from "@/lib/draftSim";
 import { MockSurvey } from "./Feedback";
 import { Flags, POS_CELL, PosBadge, TierBadge, fmt } from "./ui";
 import { TARGET, yy } from "@/lib/season";
@@ -97,6 +98,17 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
     return scoreCandidates(ctxFor(userTeam)).sort((a, b) => b.score - a.score).slice(0, 4);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, onClock, userTeam, available, rosters]);
+
+  // Monte Carlo: chance each player is still there at your NEXT pick if you pass on him now
+  const odds = useMemo(() => {
+    if (!userOnClock) return null;
+    const next = userPickIdx.find((i) => i > pickIdx);
+    if (next == null) return null;
+    const watch = available.slice(0, 80);
+    const map = simulateAvailability({ byAdp, picks, byId, bots, cfg: lcfg, teams, rounds }, pickIdx + 1, next, userTeam, watch, 150, pickIdx * 7919 + 13);
+    return { next, map };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userOnClock, pickIdx]);
 
   // Bot (and auto-me) picks
   useEffect(() => {
@@ -254,6 +266,15 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
     }
   };
   const myLineup = results[userTeam];
+  const tiers = tierCountdown(available);
+  const recentPicks = picks.slice(-4).map((id, k) => {
+    const idx = picks.length - Math.min(4, picks.length) + k;
+    const pl = byId.get(id)!;
+    return { idx, pl, team: teamOnClock(idx, teams), r: pickReaction(idx + 1, pl) };
+  }).reverse();
+  const showLiveGrades = phase === "live" && pickIdx >= teams * 2;
+  const replay = phase === "done" ? draftReplay(picks, byId, byAdp, userPickIdx) : null;
+  const oddsCls = (x: number) => (x >= 0.7 ? "text-emerald-300" : x >= 0.35 ? "text-amber-300" : "text-rose-300");
 
   const list = available.filter((p) =>
     (posFilter === "ALL" || p.pos === posFilter) && (!q || p.name.toLowerCase().includes(q.toLowerCase())),
@@ -295,6 +316,24 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
         </div>
       </div>
 
+      {phase === "live" && recentPicks.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto [scrollbar-width:none]">
+          {recentPicks.map(({ idx, pl, team, r }) => (
+            <div key={idx} className="flex shrink-0 items-center gap-2 rounded-lg bg-slate-900/70 px-3 py-1.5 text-xs ring-1 ring-slate-800">
+              <span className="tabular-nums text-slate-500">{roundPick(idx + 1, teams)}</span>
+              <span className="text-slate-400">{teamName(team)}</span>
+              <PosBadge pos={pl.pos} />
+              <span className="font-medium text-white">{pl.name}</span>
+              {r.kind !== "fair" && (
+                <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold ${r.kind === "reach" ? "bg-rose-500/15 text-rose-300" : "bg-emerald-500/15 text-emerald-300"}`}>
+                  {r.kind === "steal" ? `STEAL +${r.delta}` : r.kind === "value" ? `VALUE +${r.delta}` : `REACH ${r.delta}`}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
       {phase === "done" && (
         <MockSurvey context={{ opponents: locked?.leagueName ? "leaguemates" : "personalities", teams: String(teams), slot: String(userTeam + 1) }} />
       )}
@@ -321,6 +360,35 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
         </div>
       )}
 
+      {replay && (
+        <div className="grid gap-3 md:grid-cols-2">
+          {replay.bestValue && (
+            <div className="rounded-xl bg-emerald-500/10 p-4 ring-1 ring-emerald-500/30">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-emerald-300">Your best value pick</div>
+              <div className="mt-1 text-sm text-white">
+                <b>{replay.bestValue.took.name}</b> at {roundPick(replay.bestValue.pickNo, teams)}
+                <span className="text-slate-400"> · ADP {replay.bestValue.took.cur.adp}{replay.bestValue.r.delta > 0 ? `, ${replay.bestValue.r.delta} picks after his ADP` : ""}</span>
+              </div>
+            </div>
+          )}
+          <div className="rounded-xl bg-slate-900/60 p-4 ring-1 ring-slate-800">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Replay: biggest missed opportunities</div>
+            {replay.misses.length === 0 ? (
+              <p className="mt-1 text-sm text-slate-300">None: at every pick you took the best projected player available at that position.</p>
+            ) : (
+              <ul className="mt-1 space-y-1 text-sm">
+                {replay.misses.map((m) => (
+                  <li key={m.pickNo} className="text-slate-300">
+                    {roundPick(m.pickNo, teams)}: you took <b className="text-white">{m.took.name}</b>, but <b className="text-white">{m.alt?.name}</b> was still there
+                    <span className="text-rose-300"> (+{fmt(m.gap, 0)} projected pts)</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="grid gap-4 lg:grid-cols-[1fr_300px]">
         {/* available players */}
         <div className="rounded-xl bg-slate-900/60 ring-1 ring-slate-800">
@@ -335,10 +403,37 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
               className="min-w-0 flex-1 rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white ring-1 ring-slate-800 placeholder:text-slate-500 focus:outline-none" />
             {userOnClock && <span className="w-full text-xs font-semibold text-emerald-400 sm:w-auto">You&apos;re on the clock — pick a player</span>}
           </div>
+          {phase === "live" && (
+            <div className="flex gap-1.5 overflow-x-auto border-b border-slate-800 px-3 py-2 [scrollbar-width:none]">
+              {POSITIONS.map((pos) => {
+                const t = tiers[pos];
+                if (!t) return null;
+                const urgent = t.left <= 2;
+                return (
+                  <span key={pos} title={`Left in tier ${t.tier}: ${t.names.join(", ")}${t.left > 3 ? "…" : ""}`}
+                    className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] ring-1 ${urgent ? "bg-rose-500/10 text-rose-200 ring-rose-500/30" : "bg-slate-900 text-slate-300 ring-slate-800"}`}>
+                    <PosBadge pos={pos} /> Tier {t.tier}: <b className="tabular-nums">{t.left}</b> left{urgent ? " ⚠" : ""}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+          {odds && suggestions.length > 0 && (
+            <div className="border-b border-slate-800 bg-slate-950/60 px-3 py-2 text-[11px] text-slate-400">
+              <span className="font-semibold text-slate-200">If you wait until {roundPick(odds.next + 1, teams)}</span> ({odds.next - pickIdx} picks):{" "}
+              {suggestions.slice(0, 4).map((x, i) => {
+                const pr = odds.map.get(x.player.id) ?? 0;
+                return (
+                  <span key={x.player.id}>{i ? " · " : ""}{x.player.name} <b className={oddsCls(pr)}>{Math.round(pr * 100)}%</b></span>
+                );
+              })}
+              <span className="text-slate-600"> chance still available (150 simulations)</span>
+            </div>
+          )}
           <div className="max-h-[560px] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-slate-900 text-[11px] uppercase tracking-wide text-slate-400">
-                <tr><th className="hidden px-2 py-1.5 text-left sm:table-cell">ADP</th><th className="px-2 py-1.5 text-left">Player</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Pos</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Tier</th><th className="px-2 py-1.5 text-left">PPG</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">VORP</th><th /></tr>
+                <tr><th className="hidden px-2 py-1.5 text-left sm:table-cell">ADP</th><th className="px-2 py-1.5 text-left">Player</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Pos</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Tier</th><th className="px-2 py-1.5 text-left">PPG</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">VORP</th>{odds && <th className="px-2 py-1.5 text-left" title="Chance he's still available at your next pick">Next</th>}<th /></tr>
               </thead>
               <tbody>
                 {list.map((p) => (
@@ -357,6 +452,11 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
                     <td className="hidden px-2 py-1.5 sm:table-cell"><TierBadge tier={p.cur.tier} /></td>
                     <td className="px-2 py-1.5 tabular-nums text-slate-200">{fmt(p.cur.ppg)}</td>
                     <td className="hidden px-2 py-1.5 tabular-nums text-slate-300 sm:table-cell">{fmt(p.cur.vorp, 0)}</td>
+                    {odds && (
+                      <td className={`px-2 py-1.5 text-xs font-semibold tabular-nums ${odds.map.has(p.id) ? oddsCls(odds.map.get(p.id)!) : "text-slate-600"}`}>
+                        {odds.map.has(p.id) ? `${Math.round(odds.map.get(p.id)! * 100)}%` : "—"}
+                      </td>
+                    )}
                     <td className="px-2 py-1.5 text-right">
                       <button disabled={!userOnClock} onClick={() => draft(p.id)}
                         className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-600">
@@ -419,6 +519,11 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
           {Array.from({ length: teams }, (_, t) => (
             <div key={t} className={`truncate bg-slate-900 px-1.5 py-2 text-center text-[11px] font-semibold ${t === userTeam ? "text-emerald-400" : "text-slate-400"}`} title={bots[t]?.style}>
               {teamName(t)}
+              {showLiveGrades && (
+                <span className="ml-1 rounded bg-slate-800 px-1 text-[10px] font-bold text-emerald-300" title="Live grade from projected starters so far">
+                  {letterGrade((results[t].starterPoints - mean) / sd)}
+                </span>
+              )}
             </div>
           ))}
           {Array.from({ length: rounds }, (_, r) => (
@@ -434,7 +539,14 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
                     {p ? (
                       <>
                         <div className="truncate font-semibold text-white">{p.name}</div>
-                        <div className="text-slate-300/80">{p.pos} · {roundPick(idx + 1, teams)}</div>
+                        <div className="flex items-center gap-1 text-slate-300/80">
+                          {p.pos} · {roundPick(idx + 1, teams)}
+                          {(() => {
+                            const r = pickReaction(idx + 1, p);
+                            return r.kind === "steal" ? <span className="font-bold text-emerald-300" title={`Steal: ${r.delta} picks after ADP`}>▲{r.delta}</span>
+                              : r.kind === "reach" ? <span className="font-bold text-rose-300" title={`Reach: ${-r.delta} picks before ADP`}>▼{-r.delta}</span> : null;
+                          })()}
+                        </div>
                       </>
                     ) : <div className="text-slate-700">{roundPick(idx + 1, teams)}</div>}
                   </div>

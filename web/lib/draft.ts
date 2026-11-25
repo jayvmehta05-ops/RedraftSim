@@ -178,7 +178,9 @@ export function botPick(ctx: PickContext, bot: BotProfile, rng: () => number): R
     const phase = round <= 5 ? "early" : round <= 10 ? "mid" : "late";
     const bias = bot.posBiasByPhase ? (bot.posBiasByPhase[phase][p.pos] ?? 0) : (bot.posBias[p.pos] ?? 0) * early;
     const rookie = p.rookie ? bot.rookieBias : 0;
-    const score = s.parts.value + s.parts.vorp * bot.vorpWeight + s.parts.need + run + bias + rookie + gaussian(rng) * bot.noise;
+    // Real drafts drift further from ADP as they go (pick 20: about ±5, pick 100: about ±10), so randomness grows with the pick
+    const spread = bot.noise * (1 + (ctx.pickIdx + 1) / 30);
+    const score = s.parts.value + s.parts.vorp * bot.vorpWeight + s.parts.need + run + bias + rookie + gaussian(rng) * spread;
     return { p, score };
   });
   scored.sort((a, b) => b.score - a.score);

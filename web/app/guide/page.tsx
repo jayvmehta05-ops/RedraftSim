@@ -46,9 +46,10 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
     how: [
       "Choose your draft slot and bot speed, then start. When you're on the clock, the best options for your roster are marked SUGGESTED.",
       "With a league imported, choose 'My leaguemates': each bot copies a real manager's habits from your league's past drafts.",
-      "At the end every team gets a grade from projected starter points. Tap 'Share result' for a link with a preview image for your group chat.",
+      "During the draft: steal and reach badges on every pick, live grades for every team from round 3, and a tier countdown (how many players are left in the best tier at each position).",
+      "At the end every team gets a grade, and the replay shows your best-value pick and the biggest players you passed on. Tap 'Share result' for a link with a preview image.",
     ],
-    tip: "Run several mocks from the same slot: you'll learn which players are realistically there at each of your picks.",
+    tip: "When you're on the clock, the Next column shows each player's chance of still being there at your next pick (150 simulated drafts). If your target is 80%+ to come back, take someone else now.",
   },
   {
     title: "Live Draft",
