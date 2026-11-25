@@ -186,6 +186,10 @@ export interface ImportedLeague {
     /** board player ids added by hand / imported players removed by hand (kept across refreshes) */
     manualIds?: string[];
     removedIds?: string[];
+    /** current season record when the platform provides it */
+    record?: { wins: number; losses: number; ties: number; pointsFor: number };
+    /** FAAB budget remaining (Sleeper) */
+    faabLeft?: number;
   }[];
   fetchedAt?: string;
 }

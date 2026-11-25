@@ -109,6 +109,8 @@ After the draft, every team is graded on projected starter points.
 | Mock Draft Room | Snake draft vs. AI personalities, or vs. bots that draft like your real leaguemates (positional tendencies by round, learned from past drafts). Finished mocks get a share link (`/share/<code>`) with a generated preview image |
 | Settings → Describe leaguemates & edit rosters | Manual overrides for everything learned automatically: per-manager style preset, position leans, randomness, rookie appetite, run-following, trade openness, or a plain-English description parsed by transparent keyword rules (`web/lib/profiles.ts`); add/remove roster players (kept across refreshes); or set up a whole league by hand when there's nothing to import |
 | Live Draft | Follows a real Sleeper draft (public draft API, polled every 5 s) and ranks your next pick |
+| My League → Waivers | Unrostered board players ranked by gain to your best lineup, with who they'd start over, best drop and a FAAB bid range (Sleeper budgets shown in $) |
+| My League → Power rankings | Every team ranked by projected starting lineup vs. its actual record; shareable `/rankings/<code>` page with a preview image |
 | Trades | Loads every roster in the imported league; suggests 1-for-1 to 2-for-2 trades that raise your best starting lineup without meaningfully hurting theirs, with an acceptance estimate (their lineup gain, ADP name value, their drafting tastes); manual analyzer. Time frame: rest of season (ESPN rest-of-season projection when available), next season, or both |
 | Keepers | Keeper value = 2027 VORP minus the expected VORP at the pick you give up |
 | Weekly Trends, `/risers` | Week-over-week ADP movement; `/risers` is a static, search-friendly page that refreshes every Tuesday |

@@ -108,11 +108,21 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
   const users = await getJson<{ user_id: string; display_name: string }[]>(
     `https://api.sleeper.app/v1/league/${lg.league_id}/users`).catch(() => []);
   const managers = users.map((u) => ({ id: u.user_id, name: u.display_name }));
-  const sleeperRosters = await getJson<{ roster_id: number; owner_id: string | null; players: string[] | null }[]>(
+  const sleeperRosters = await getJson<{
+    roster_id: number; owner_id: string | null; players: string[] | null;
+    settings?: { wins?: number; losses?: number; ties?: number; fpts?: number; fpts_decimal?: number; waiver_budget_used?: number };
+  }[]>(
     `https://api.sleeper.app/v1/league/${lg.league_id}/rosters`).catch(() => []);
   const rosters = sleeperRosters
     .filter((r) => r.owner_id)
-    .map((r) => ({ managerId: String(r.owner_id), playerIds: (r.players ?? []).map(String), idType: "sleeper" as const }));
+    .map((r) => ({
+      managerId: String(r.owner_id), playerIds: (r.players ?? []).map(String), idType: "sleeper" as const,
+      record: {
+        wins: r.settings?.wins ?? 0, losses: r.settings?.losses ?? 0, ties: r.settings?.ties ?? 0,
+        pointsFor: (r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100,
+      },
+      faabLeft: lg.settings?.waiver_budget ? Number(lg.settings.waiver_budget) - (r.settings?.waiver_budget_used ?? 0) : undefined,
+    }));
   const drafts: LeagueDraft[] = [];
   let leagueId: string | null = lg.league_id;
   for (let hop = 0; hop < 3 && leagueId; hop++) {
@@ -159,6 +169,8 @@ interface EspnLeague {
   teams?: {
     id: number; name?: string; location?: string; nickname?: string; owners?: string[];
     roster?: { entries?: { playerId: number }[] };
+    record?: { overall?: { wins?: number; losses?: number; ties?: number; pointsFor?: number } };
+    transactionCounter?: { acquisitionBudgetSpent?: number };
   }[];
   members?: { id: string; displayName: string }[];
   draftDetail?: { drafted?: boolean; picks?: { overallPickNumber: number; roundId: number; teamId: number; playerId: number }[] };
@@ -243,6 +255,10 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
   return {
     rosters: (lg.teams ?? []).map((t) => ({
       managerId: String(t.id), playerIds: (t.roster?.entries ?? []).map((e) => String(e.playerId)), idType: "espn" as const,
+      record: {
+        wins: t.record?.overall?.wins ?? 0, losses: t.record?.overall?.losses ?? 0, ties: t.record?.overall?.ties ?? 0,
+        pointsFor: t.record?.overall?.pointsFor ?? 0,
+      },
     })),
     fetchedAt: new Date().toISOString(),
     provider: "espn", leagueId: id, season: String(season), name: s.name, teams: s.size,

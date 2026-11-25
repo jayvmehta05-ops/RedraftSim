@@ -13,7 +13,7 @@ import KeeperCalc from "./KeeperCalc";
 import LiveDraft from "./LiveDraft";
 import MockDraft from "./MockDraft";
 import SettingsDrawer from "./SettingsDrawer";
-import TradeAssistant from "./TradeAssistant";
+import LeagueHub from "./LeagueHub";
 import TrendTracker from "./TrendTracker";
 import Welcome from "./Welcome";
 import { IconBoard, IconKeeper, IconLive, IconMock, IconSettings, IconSwap, IconTrend, Logo } from "./icons";
@@ -23,7 +23,7 @@ const TABS = [
   { id: "board", label: `${TARGET} Big Board`, short: "Board", icon: IconBoard },
   { id: "mock", label: "Mock Draft", short: "Mock", icon: IconMock },
   { id: "live", label: "Live Draft", short: "Live", icon: IconLive },
-  { id: "trades", label: "Trades", short: "Trades", icon: IconSwap },
+  { id: "trades", label: "My League", short: "League", icon: IconSwap },
   { id: "keepers", label: "Keepers", short: "Keepers", icon: IconKeeper },
   { id: "trends", label: "Trends", short: "Trends", icon: IconTrend },
 ] as const;
@@ -207,7 +207,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         {tab === "mock" && <MockDraft board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} onOpenEditor={() => setEditorOpen(true)} />}
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
         {tab === "trades" && (
-          <TradeAssistant board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
+          <LeagueHub board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
             weeksLeft={Math.max(0, 17 - m.throughWeek)} onOpenSettings={() => setSettingsOpen(true)}
             onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} onOpenEditor={() => setEditorOpen(true)} />
         )}

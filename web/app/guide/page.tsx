@@ -60,6 +60,15 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
     ],
   },
   {
+    title: "Waivers and power rankings",
+    what: "In-season help from your imported league's rosters: the best free agents for your lineup, and every team ranked by roster strength.",
+    how: [
+      "Open My League → Waivers. Free agents are ranked by how much each improves your best starting lineup, with who they'd start over, who to drop and a FAAB bid range.",
+      "My League → Power rankings ranks every team by its projected starting lineup, next to its real record, so you can see who's better or worse than their record.",
+      "Tap Share rankings for a link with a preview image to drop in your league chat.",
+    ],
+  },
+  {
     title: "Trade assistant",
     what: "Finds trades that improve your starting lineup and that the other manager would plausibly accept, and grades any trade you're considering.",
     how: [
