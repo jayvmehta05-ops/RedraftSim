@@ -209,4 +209,13 @@ export interface ImportedLeague {
   };
   /** league format as the platform reports it */
   kind?: "redraft" | "keeper" | "dynasty";
+  /** the league's calendar: first playoff week, championship (last) week, and trade deadline */
+  schedule?: {
+    playoffStart: number;
+    lastWeek: number;
+    /** last NFL week trades are allowed (Sleeper), or null when there's no deadline */
+    tradeDeadlineWeek?: number | null;
+    /** trade deadline as a timestamp in ms (ESPN) */
+    tradeDeadlineAt?: number | null;
+  };
 }

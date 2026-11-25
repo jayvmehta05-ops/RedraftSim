@@ -116,6 +116,20 @@ async function sleeperWeekly(lg: SleeperLeague, ownerOf: Map<number, string>) {
   return weeklyFrom(played === -1 ? weeks : weeks.slice(0, played));
 }
 
+/** Playoff weeks and trade deadline from Sleeper league settings. */
+function sleeperSchedule(st: Record<string, number>): ImportedLeague["schedule"] {
+  const playoffStart = Number(st.playoff_week_start) || 15;
+  const rounds = Math.max(1, Math.ceil(Math.log2(Math.max(2, Number(st.playoff_teams) || 6))));
+  // playoff_round_type: 0 = one week per round, 1 = two-week championship, 2 = two weeks per round
+  const type = Number(st.playoff_round_type) || 0;
+  const weeks = type === 2 ? rounds * 2 : type === 1 ? rounds + 1 : rounds;
+  const deadline = Number(st.trade_deadline);
+  return {
+    playoffStart, lastWeek: Math.min(18, playoffStart + weeks - 1),
+    tradeDeadlineWeek: deadline && deadline < 99 ? deadline : null,
+  };
+}
+
 async function importSleeper(id: string): Promise<ImportedLeague> {
   const lg = await getJson<SleeperLeague>(`https://api.sleeper.app/v1/league/${encodeURIComponent(id)}`);
   if (!lg || !lg.league_id) throw new ImportError("League not found. Check the league ID.", 404);
@@ -195,6 +209,7 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
     teams: lg.total_rosters, roster, scoring, draftRounds: slotsTotal,
     notes: Array.from(new Set(notes)), managers, drafts: fullDrafts,
     kind: leagueType === 2 ? "dynasty" : leagueType === 1 ? "keeper" : "redraft",
+    schedule: sleeperSchedule(lg.settings ?? {}),
   };
 }
 
@@ -205,6 +220,8 @@ interface EspnLeague {
     rosterSettings: { lineupSlotCounts: Record<string, number> };
     scoringSettings: { scoringItems: { statId: number; points: number; pointsOverrides?: Record<string, number> }[] };
     draftSettings?: { type?: string; keeperCount?: number };
+    scheduleSettings?: { matchupPeriodCount?: number; playoffTeamCount?: number; playoffMatchupPeriodLength?: number };
+    tradeSettings?: { deadlineDate?: number };
   };
   teams?: {
     id: number; name?: string; location?: string; nickname?: string; owners?: string[];
@@ -230,6 +247,18 @@ const ESPN_SCORING: Record<number, keyof Scoring> = {
   53: "rec", 42: "rec_yd", 43: "rec_td", 44: "rec_2pt", 72: "fum_lost",
 };
 const ESPN_POS: Record<number, string> = { 1: "QB", 2: "RB", 3: "WR", 4: "TE", 5: "K", 16: "DEF" };
+
+/** Playoff weeks and trade deadline from ESPN league settings. */
+function espnSchedule(s: NonNullable<EspnLeague["settings"]>): ImportedLeague["schedule"] {
+  const regular = s.scheduleSettings?.matchupPeriodCount || 14;
+  const rounds = Math.max(1, Math.ceil(Math.log2(Math.max(2, s.scheduleSettings?.playoffTeamCount || 4))));
+  const length = Math.max(1, s.scheduleSettings?.playoffMatchupPeriodLength || 1);
+  const deadline = s.tradeSettings?.deadlineDate;
+  return {
+    playoffStart: regular + 1, lastWeek: Math.min(18, regular + rounds * length),
+    tradeDeadlineAt: deadline && deadline > 0 ? deadline : null,
+  };
+}
 
 async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<ImportedLeague> {
   const base = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${encodeURIComponent(id)}`;
@@ -321,6 +350,7 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
     provider: "espn", leagueId: id, season: String(season), name: s.name, teams: s.size,
     roster, scoring, draftRounds: starters + roster.BENCH, notes: Array.from(new Set(notes)), managers, drafts,
     kind: (s.draftSettings?.keeperCount ?? 0) > 0 ? "keeper" : "redraft",
+    schedule: espnSchedule(s),
   };
 }
 

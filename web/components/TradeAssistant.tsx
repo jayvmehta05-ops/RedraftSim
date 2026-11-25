@@ -22,6 +22,8 @@ interface Props {
   weeksLeft: number;
   /** keeper league: allow valuing next season too */
   keeper: boolean;
+  /** false once the league's trade deadline (or the playoffs) has passed */
+  tradesOpen: boolean;
   onOpenSettings: () => void;
   onLeagueRefreshed: (l: ImportedLeague) => void;
   onChooseManager: (id: string | null) => void;
@@ -97,7 +99,7 @@ function Empty({ title, body, action, error }: { title: string; body: string; ac
   );
 }
 
-export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, keeper, onOpenSettings, onChooseManager, onOpenEditor, onRefresh, onLeagueEdit, refreshing, refreshError }: Props) {
+export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, keeper, tradesOpen, onOpenSettings, onChooseManager, onOpenEditor, onRefresh, onLeagueEdit, refreshing, refreshError }: Props) {
   const [picked, setHorizon] = useState<Horizon>("ros");
   const horizon: Horizon = keeper ? (weeksLeft > 0 ? picked : "both") : "ros"; // offseason keeper leagues look ahead
   const [partnerId, setPartnerId] = useState<string | null>(null);
@@ -211,6 +213,13 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
         })}
       </div>
 
+      {!tradesOpen ? (
+        <div className="rounded-xl bg-slate-900/60 p-6 text-sm text-slate-400 ring-1 ring-slate-800">
+          <div className="font-semibold text-white">Trades are closed for the season</div>
+          Your league&apos;s trade deadline has passed{weeksLeft > 0 ? " (or the playoffs have started)" : ""}, so trade ideas are switched off.
+          From here it&apos;s lineups and waivers: use Start/Sit every week and Waivers for pickups.
+        </div>
+      ) : (<>
       <div>
         <h2 className="mb-2 text-sm font-semibold text-white">Suggested trades</h2>
         {suggestions.length === 0 ? (
@@ -279,6 +288,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
           </div>
         )}
       </div>
+      </>)}
     </section>
   );
 }

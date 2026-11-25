@@ -21,7 +21,10 @@ const BENCH_DEPTH = 4;
 export function playerValue(p: RankedPlayer, horizon: Horizon, weeksLeft: number): number {
   const next = Math.max(0, p.cur.points);
   if (horizon === "next") return next;
-  const rosPpg = p.cur.espnRosPpg ?? (p.g26 > 0 ? 0.6 * p.cur.ppg26 + 0.4 * p.cur.ppg : 0);
+  // Without ESPN's rest-of-season projection, blend this season's average with our projection, trusting the
+  // season more as games pile up (early in the year a hot or cold start is mostly noise)
+  const seasonWeight = p.g26 > 0 ? Math.min(0.75, p.g26 / (p.g26 + 4)) : 0;
+  const rosPpg = p.cur.espnRosPpg ?? (p.g26 > 0 ? seasonWeight * p.cur.ppg26 + (1 - seasonWeight) * p.cur.ppg : 0);
   if (horizon === "week") {
     // One week (1-week / loan trades): only this week's health matters
     const status = p.injury ?? "";

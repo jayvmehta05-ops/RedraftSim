@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } from "@/lib/refresh";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
+import { seasonPhase } from "@/lib/phase";
 import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import LuckMeter from "./LuckMeter";
@@ -50,12 +51,18 @@ function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember
 /** "My League": trades, waivers and power rankings for an imported (or hand-made) league. */
 export default function LeagueHub(props: {
   board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague | null; myManager: string | null;
-  leaguemates: LeaguemateProfile[]; weeksLeft: number; keeper: boolean; onOpenSettings: () => void;
+  leaguemates: LeaguemateProfile[]; keeper: boolean; onOpenSettings: () => void;
+  /** last NFL week with complete stats (drives the season phase) */
+  throughWeek: number;
   onLeagueRefreshed: (l: ImportedLeague) => void; onChooseManager: (id: string | null) => void; onOpenEditor: () => void;
   /** save a hand edit to the league (e.g. locking a player) */
   onLeagueEdit: (l: ImportedLeague) => void;
 }) {
-  const [section, setSection] = useState<Section>("team");
+  // Open on what matters for this point in the season: lineups once trading is over, rosters before that
+  const [section, setSection] = useState<Section>(() => {
+    const p = seasonPhase(props.throughWeek, props.league, 0);
+    return p.phase === "playoffs" || (p.phase === "stretch" && !p.tradesOpen) ? "startsit" : "team";
+  });
   const { league, myManager, onLeagueRefreshed } = props;
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -117,10 +124,12 @@ export default function LeagueHub(props: {
     { id: "power", label: "Power rankings", needsMe: false },
     { id: "luck", label: "Luck meter", needsMe: false },
   ];
+  const phase = seasonPhase(props.throughWeek, league, now);
+  const weeksLeft = phase.weeksLeft;
   const current = sections.find((s) => s.id === section)!;
   const blocked = section !== "trades" && (!ready || (current.needsMe && !league?.managers.some((m) => m.id === myManager)));
   // Redraft rosters reset after the season, so in-season tools pause until next season (keeper leagues look ahead)
-  const offseason = props.weeksLeft <= 0 && !props.keeper && section !== "luck";
+  const offseason = phase.phase === "offseason" && !props.keeper && section !== "luck";
 
   return (
     <div className="space-y-4">
@@ -132,6 +141,15 @@ export default function LeagueHub(props: {
           </button>
         ))}
       </div>
+      {league && !offseason && (
+        <div className="flex items-start gap-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-transparent px-4 py-3 ring-1 ring-emerald-500/20">
+          <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${phase.phase === "playoffs" ? "animate-pulse bg-amber-400" : "bg-emerald-400"}`} aria-hidden />
+          <div className="min-w-0 text-xs">
+            <div className="font-semibold text-white">{phase.headline}</div>
+            <div className="mt-0.5 text-slate-400">{phase.tip}</div>
+          </div>
+        </div>
+      )}
       {needsLogin && league?.provider === "espn" && (
         <EspnLogin busy={refreshing} error={refreshError && /rejected/i.test(refreshError) ? refreshError : null} onSubmit={(a, remember) => { if (remember) rememberEspnAuth(a); refresh(a); }} />
       )}
@@ -153,23 +171,23 @@ export default function LeagueHub(props: {
         </div>
       )}
       {!offseason && (section === "trades" || blocked) && (
-        <TradeAssistant {...props} onRefresh={() => refresh()} refreshing={refreshing} refreshError={needsLogin ? null : refreshError} />
+        <TradeAssistant {...props} weeksLeft={weeksLeft} tradesOpen={phase.tradesOpen} onRefresh={() => refresh()} refreshing={refreshing} refreshError={needsLogin ? null : refreshError} />
       )}
       {!offseason && section === "team" && !blocked && league && myManager && (
         <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} leaguemates={props.leaguemates}
-          weeksLeft={props.weeksLeft} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} onLeagueEdit={props.onLeagueEdit} />
+          weeksLeft={weeksLeft} tradesOpen={phase.tradesOpen} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} onLeagueEdit={props.onLeagueEdit} />
       )}
       {!offseason && section === "startsit" && !blocked && league && myManager && (
         <StartSit board={props.board} cfg={props.cfg} league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />
       )}
       {!offseason && section === "waivers" && !blocked && league && myManager && (
-        <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} keeper={props.keeper} />
+        <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={weeksLeft} keeper={props.keeper} />
       )}
       {section === "luck" && !blocked && league && (
         <LuckMeter league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />
       )}
       {!offseason && section === "power" && !blocked && league && (
-        <PowerRankings board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} keeper={props.keeper} />
+        <PowerRankings board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={weeksLeft} keeper={props.keeper} />
       )}
     </div>
   );

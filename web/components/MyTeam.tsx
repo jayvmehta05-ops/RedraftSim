@@ -81,9 +81,9 @@ function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked }:
 }
 
 /** Actions for a clicked player: trade for them (or a 1-week trade), or shop your own player. */
-function PlayerActions({ player, owner, isMine, weekTrades, weeksLeft, onOpenEditor, ideas, isLocked, onToggleLock }: {
+function PlayerActions({ player, owner, isMine, weekTrades, weeksLeft, onOpenEditor, ideas, isLocked, onToggleLock, tradesOpen }: {
   player: RankedPlayer; owner: LeagueTeam; isMine: boolean; weekTrades: boolean; weeksLeft: number; onOpenEditor: () => void;
-  ideas: (mode: Mode) => TradeEval[]; isLocked: boolean; onToggleLock: () => void;
+  ideas: (mode: Mode) => TradeEval[]; isLocked: boolean; onToggleLock: () => void; tradesOpen: boolean;
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
   const results = useMemo(() => (mode && !isLocked ? ideas(mode) : []), [mode, ideas, isLocked]);
@@ -98,7 +98,9 @@ function PlayerActions({ player, owner, isMine, weekTrades, weeksLeft, onOpenEdi
   return (
     <div className="space-y-3 border-b border-slate-800/70 bg-slate-900/70 px-4 py-3">
       <div className="flex flex-wrap gap-2">
-        {isLocked ? (
+        {!tradesOpen ? (
+          <p className="self-center text-xs text-slate-400">Your league&apos;s trade deadline has passed, so trades are closed for the season.</p>
+        ) : isLocked ? (
           <p className="self-center text-xs text-amber-200">
             {player.name} is locked, so he can&apos;t be traded and won&apos;t appear in any trade idea. He still counts in {isMine ? "your" : "their"} lineup.
           </p>
@@ -110,12 +112,12 @@ function PlayerActions({ player, owner, isMine, weekTrades, weeksLeft, onOpenEdi
             {weekTrades && weeksLeft > 0 && btn("week", "1-week trade", "Borrow him for this week")}
           </>
         )}
-        <button onClick={() => { setMode(null); onToggleLock(); }}
+        {tradesOpen && <button onClick={() => { setMode(null); onToggleLock(); }}
           className={`ml-auto inline-flex items-center gap-1.5 self-center rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 ${isLocked ? "bg-amber-500/15 text-amber-200 ring-amber-500/40 hover:bg-amber-500/25" : "text-slate-400 ring-slate-700 hover:text-white"}`}
           title="For players on a 1-week trade or otherwise not tradeable">
           {isLocked ? <><IconUnlock className="h-3.5 w-3.5" /> Unlock</> : <><IconLock className="h-3.5 w-3.5" /> Can&apos;t be traded</>}
-        </button>
-        {!isMine && !isLocked && !weekTrades && weeksLeft > 0 && (
+        </button>}
+        {tradesOpen && !isMine && !isLocked && !weekTrades && weeksLeft > 0 && (
           <button onClick={onOpenEditor} className="self-center text-[11px] text-slate-500 hover:text-slate-300">League allows 1-week trades? Turn it on →</button>
         )}
       </div>
@@ -141,9 +143,9 @@ function PlayerActions({ player, owner, isMine, weekTrades, weeksLeft, onOpenEdi
 }
 
 /** Rosters: any team's best lineup and bench. Click a player to trade for them, or to shop your own. */
-export default function MyTeam({ board, cfg, league, myManager, leaguemates, weeksLeft, keeper, onGo, onOpenEditor, onLeagueEdit }: {
+export default function MyTeam({ board, cfg, league, myManager, leaguemates, weeksLeft, tradesOpen, keeper, onGo, onOpenEditor, onLeagueEdit }: {
   board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string; leaguemates: LeaguemateProfile[];
-  weeksLeft: number; keeper: boolean; onGo: (section: "trades" | "waivers" | "power") => void; onOpenEditor: () => void;
+  weeksLeft: number; tradesOpen: boolean; keeper: boolean; onGo: (section: "trades" | "waivers" | "power") => void; onOpenEditor: () => void;
   onLeagueEdit: (l: ImportedLeague) => void;
 }) {
   const [picked, setHorizon] = useState<Horizon>("ros");
@@ -222,7 +224,7 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
       {x && selected === x.p.id && (
         <PlayerActions key={`${viewing.id}-${x.p.id}`} player={x.p} owner={viewing} isMine={isMine}
           weekTrades={!!league.rules?.weekTrades} weeksLeft={weeksLeft} onOpenEditor={onOpenEditor}
-          isLocked={locked.has(x.p.id)} onToggleLock={() => onLeagueEdit(toggleLock(league, x.p.id))}
+          isLocked={locked.has(x.p.id)} onToggleLock={() => onLeagueEdit(toggleLock(league, x.p.id))} tradesOpen={tradesOpen}
           ideas={(m) => ideas(m, x.p)} />
       )}
     </div>
@@ -287,7 +289,7 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
       )}
 
       <p className="text-xs text-slate-400">
-        {isMine ? "Click one of your players to see what he'd bring back in a trade." : `Click any of ${viewing.name}'s players to see offers they might accept.`}
+        {!tradesOpen ? "Trades are closed for the season, so this is a view of every roster." : isMine ? "Click one of your players to see what he'd bring back in a trade." : `Click any of ${viewing.name}'s players to see offers they might accept.`}
       </p>
 
       <div>

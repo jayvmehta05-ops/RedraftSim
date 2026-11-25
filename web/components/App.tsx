@@ -6,6 +6,7 @@ import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
 import { buildLeaguemateBots } from "@/lib/leaguemates";
 import { type ProfileOverride, effectiveProfile } from "@/lib/profiles";
+import { seasonPhase } from "@/lib/phase";
 import { keepRosterEdits, keeperOn } from "@/lib/rosters";
 import AccountButton from "./AccountButton";
 import BigBoard from "./BigBoard";
@@ -107,10 +108,13 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       setMyManagers(mys);
       setAllOverrides(JSON.parse(localStorage.getItem(PROFILES_KEY) ?? "{}"));
       setSiteKeeper(localStorage.getItem(KEEPER_KEY) === "1");
+      // During the season, people with a league come back for their league: open there
+      const p = seasonPhase(data.meta.throughWeek, active, 0).phase;
+      if (active && me && p !== "preseason" && p !== "offseason") setTab("trades");
     } catch {
       /* storage unavailable */
     }
-  }, []);
+  }, [data.meta.throughWeek]);
   const storeSaved = (next: Record<string, ImportedLeague>) => {
     setSavedLeagues(next);
     save(SAVED_KEY, next);
@@ -278,7 +282,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
         {tab === "trades" && (
           <LeagueHub board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
-            weeksLeft={Math.max(0, 17 - m.throughWeek)} keeper={keeper} onOpenSettings={() => setSettingsOpen(true)}
+            throughWeek={m.throughWeek} keeper={keeper} onOpenSettings={() => setSettingsOpen(true)}
             onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} onOpenEditor={() => setEditorOpen(true)} onLeagueEdit={editLeague} />
         )}
         {tab === "keepers" && keeper && <KeeperCalc board={board} cfg={cfg} />}
