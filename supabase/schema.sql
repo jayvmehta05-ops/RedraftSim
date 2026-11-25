@@ -17,6 +17,11 @@ create table if not exists public.user_store (
 
 alter table public.user_store enable row level security;
 
+-- Newer Supabase projects don't grant table access to API roles automatically. Signed-in users get
+-- access (RLS below still limits them to their own rows); signed-out visitors ("anon") get none.
+grant select, insert, update, delete on public.user_store to authenticated;
+revoke all on public.user_store from anon;
+
 drop policy if exists "read own rows" on public.user_store;
 create policy "read own rows" on public.user_store
   for select using (auth.uid() = user_id);
