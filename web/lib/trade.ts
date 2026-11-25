@@ -90,7 +90,8 @@ function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlaye
     for (const p of get) taste -= (early[p.pos] ?? 0) / 8;
   }
   // Lineup impact dominates; name value (ADP) and positional taste nudge it
-  return sigmoid(-0.3 + 45 * theirGainPct + 0.25 * Math.max(-3, Math.min(3, perceived)) + 0.5 * taste);
+  return sigmoid(-0.3 + 45 * theirGainPct + 0.25 * Math.max(-3, Math.min(3, perceived)) + 0.5 * taste
+    + 0.6 * (lean?.tradeOpenness ?? 0));
 }
 
 export function evaluateTrade(
@@ -117,7 +118,9 @@ export function evaluateTrade(
   if (theirGain > 0) reasons.push(`Fills their ${posList(give)} need, so it helps them too`);
   const early = lean?.posBiasByPhase?.early;
   const loved = give.filter((p) => (early?.[p.pos] ?? 0) >= 2).map((p) => p.pos);
-  if (loved.length) reasons.push(`${lean?.name ?? "They"} historically loves ${Array.from(new Set(loved)).join("/")}s`);
+  if (loved.length) reasons.push(`${lean?.name ?? "They"} loves ${Array.from(new Set(loved)).join("/")}s`);
+  if ((lean?.tradeOpenness ?? 0) >= 1) reasons.push(`${lean?.name ?? "They"} trades often`);
+  if ((lean?.tradeOpenness ?? 0) <= -1) reasons.push(`${lean?.name ?? "They"} rarely trades, so expect a harder sell`);
   return { partnerId, give, get, myBefore, myAfter, theirBefore, theirAfter, myGain, theirGain, accept, reasons };
 }
 

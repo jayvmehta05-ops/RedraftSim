@@ -165,7 +165,8 @@ export interface LeagueDraft {
 }
 /** A league imported from Sleeper or ESPN by /api/league. */
 export interface ImportedLeague {
-  provider: "sleeper" | "espn";
+  /** "manual" = set up by hand in the leaguemate editor (no platform import) */
+  provider: "sleeper" | "espn" | "manual";
   leagueId: string;
   season: string;
   name: string;
@@ -178,6 +179,13 @@ export interface ImportedLeague {
   managers: { id: string; name: string }[];
   drafts: LeagueDraft[];
   /** current rosters; player ids are Sleeper ids or ESPN ids depending on idType */
-  rosters?: { managerId: string; playerIds: string[]; idType: "sleeper" | "espn" }[];
+  rosters?: {
+    managerId: string;
+    playerIds: string[];
+    idType: "sleeper" | "espn";
+    /** board player ids added by hand / imported players removed by hand (kept across refreshes) */
+    manualIds?: string[];
+    removedIds?: string[];
+  }[];
   fetchedAt?: string;
 }

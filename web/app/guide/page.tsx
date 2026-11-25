@@ -26,7 +26,19 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
       "Open ⚙ Settings to flip FLEX count, superflex, PPR, passing TD points and TE premium; the whole site re-ranks instantly.",
       "Or import your league: paste a Sleeper league ID (any league), or an ESPN league ID. Public ESPN leagues need nothing else; private ones need two login cookies from your browser (instructions are in the import panel).",
       "Pick which team is yours so the mock draft knows who your opponents are.",
+      "No Sleeper or ESPN league, or your ESPN league is private? Set your league up by hand: league name and team names.",
     ],
+  },
+  {
+    title: "Describe your leaguemates (manual overrides)",
+    what: "Anything the site learns automatically can be set by hand, and your edits always win: how each leaguemate drafts and trades, and every team's roster.",
+    how: [
+      "Open ⚙ Settings → Describe leaguemates & edit rosters (also linked from the Mock Draft and Trades tabs).",
+      "Type a description like “takes a QB in the 2nd round, loves rookies, never trades” and press Apply. The site shows exactly what it understood.",
+      "Or pick a style preset (Zero RB, Hero RB, early QB, elite TE, rookie lover, veterans only, reacher, ADP follower, run follower) and fine-tune the sliders: position leans, randomness, rookies vs veterans, run-following and trade openness.",
+      "Add or remove players on any roster to fix import misses or build rosters for a hand-made league. Your roster edits survive a refresh.",
+    ],
+    tip: "Mock drafts get much more realistic when the two or three leaguemates you know best are described accurately.",
   },
   {
     title: "Mock Draft Room",

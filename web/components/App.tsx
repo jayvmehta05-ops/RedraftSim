@@ -4,7 +4,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from "@/lib/types";
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
 import { buildLeaguemateBots } from "@/lib/leaguemates";
+import { type ProfileOverride, effectiveProfile } from "@/lib/profiles";
+import { keepRosterEdits } from "@/lib/rosters";
 import BigBoard from "./BigBoard";
+import LeagueEditor from "./LeagueEditor";
 import FeedbackButton from "./Feedback";
 import KeeperCalc from "./KeeperCalc";
 import LiveDraft from "./LiveDraft";
@@ -28,6 +31,8 @@ type Tab = (typeof TABS)[number]["id"];
 const STORAGE_KEY = "redraft27.toggles";
 const LEAGUE_KEY = "redraft27.league";
 const ME_KEY = "redraft27.myManager";
+const PROFILES_KEY = "redraft27.profiles"; // { "<provider>:<leagueId>": { managerId: ProfileOverride } }
+const leagueKey = (l: ImportedLeague | null) => (l ? `${l.provider}:${l.leagueId}` : "none");
 
 /** The site's default config with an imported league's teams, roster, scoring and draft length applied. */
 function withLeague(config: LeagueConfig, league: ImportedLeague | null): LeagueConfig {
@@ -55,7 +60,21 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   const [league, setLeague] = useState<ImportedLeague | null>(null);
   const [myManager, setMyManager] = useState<string | null>(null);
   const config = useMemo(() => withLeague(siteConfig, league), [siteConfig, league]);
-  const leaguemates = useMemo(() => (league ? buildLeaguemateBots(league) : []), [league]);
+  const learned = useMemo(() => (league ? buildLeaguemateBots(league) : []), [league]);
+  const [allOverrides, setAllOverrides] = useState<Record<string, Record<string, ProfileOverride>>>({});
+  const overrides = useMemo(() => allOverrides[leagueKey(league)] ?? {}, [allOverrides, league]);
+  const setOverrides = (o: Record<string, ProfileOverride>) => {
+    const next = { ...allOverrides, [leagueKey(league)]: o };
+    setAllOverrides(next);
+    save(PROFILES_KEY, next);
+  };
+  // Learned habits with your manual edits on top (edits always win)
+  const leaguemates = useMemo(() => {
+    if (!league) return [];
+    const byId = new Map(learned.map((l) => [l.managerId, l]));
+    return league.managers.map((m) => effectiveProfile(m.id, m.name, byId.get(m.id), overrides[m.id]));
+  }, [league, learned, overrides]);
+  const [editorOpen, setEditorOpen] = useState(false);
   const defaults = useMemo(() => defaultToggles(config), [config]);
   const [toggles, setToggles] = useState<Toggles>(defaults);
   const [tab, setTab] = useState<Tab>("board");
@@ -68,6 +87,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (saved) setLeague(JSON.parse(saved));
       setMyManager(localStorage.getItem(ME_KEY));
+      setAllOverrides(JSON.parse(localStorage.getItem(PROFILES_KEY) ?? "{}"));
     } catch {
       /* storage unavailable */
     }
@@ -83,6 +103,17 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   };
   // Re-imported league (e.g. refreshed rosters): keep the chosen team and current toggles
   const refreshLeague = (lg: ImportedLeague) => {
+    const merged = keepRosterEdits(league, lg);
+    setLeague(merged);
+    save(LEAGUE_KEY, merged);
+  };
+  // From the leaguemate editor: a hand-made league is created, or an existing one is edited
+  const editLeague = (lg: ImportedLeague) => {
+    if (!league) {
+      importLeague(lg);
+      if (lg.provider === "manual" && lg.managers[0]) chooseManager(lg.managers[0].id);
+      return;
+    }
     setLeague(lg);
     save(LEAGUE_KEY, lg);
   };
@@ -173,12 +204,12 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} />
         )}
         {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} showEspn={m.publication?.show_espn_fields !== false} />}
-        {tab === "mock" && <MockDraft board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} />}
+        {tab === "mock" && <MockDraft board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} onOpenEditor={() => setEditorOpen(true)} />}
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
         {tab === "trades" && (
           <TradeAssistant board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
             weeksLeft={Math.max(0, 17 - m.throughWeek)} onOpenSettings={() => setSettingsOpen(true)}
-            onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} />
+            onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} onOpenEditor={() => setEditorOpen(true)} />
         )}
         {tab === "keepers" && <KeeperCalc board={board} cfg={cfg} />}
         {tab === "trends" && <TrendTracker board={board} trends={trends} throughWeek={m.throughWeek} />}
@@ -212,7 +243,10 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       <FeedbackButton context={{ tab, league: league ? league.provider : "none" }} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} toggles={toggles} defaults={defaults}
         onChange={updateToggles} cfg={cfg} replacement={replacement}
-        league={league} onImport={importLeague} myManager={myManager} onChooseManager={chooseManager} />
+        league={league} onImport={importLeague} myManager={myManager} onChooseManager={chooseManager}
+        onOpenEditor={() => { setSettingsOpen(false); setEditorOpen(true); }} />
+      <LeagueEditor open={editorOpen} onClose={() => setEditorOpen(false)} board={board} cfg={cfg} league={league}
+        learned={learned} overrides={overrides} onOverrides={setOverrides} onLeagueChange={editLeague} myManager={myManager} />
     </div>
   );
 }

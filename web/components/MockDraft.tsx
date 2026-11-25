@@ -30,8 +30,9 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return a;
 }
 
-export default function MockDraft({ board, cfg, leaguemates = [], myManager = null, leagueName = null }: {
+export default function MockDraft({ board, cfg, leaguemates = [], myManager = null, leagueName = null, onOpenEditor }: {
   board: RankedPlayer[]; cfg: LeagueConfig; leaguemates?: LeaguemateProfile[]; myManager?: string | null; leagueName?: string | null;
+  onOpenEditor?: () => void;
 }) {
   const teams = cfg.teams;
   // K and D/ST aren't projected: simulate the skill-position rounds and reserve the last rounds for them.
@@ -197,7 +198,14 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
               </button>
             </div>
           )}
-          <div className="mb-1 font-semibold text-slate-300">Your opponents</div>
+          <div className="mb-1 flex items-center font-semibold text-slate-300">
+            Your opponents
+            {onOpenEditor && (
+              <button onClick={onOpenEditor} className="ml-auto text-[11px] font-semibold text-emerald-400 hover:underline">
+                {leaguemates.length ? "Describe / edit leaguemates" : "Use your real leaguemates →"}
+              </button>
+            )}
+          </div>
           <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3">
             {(leagueMode ? opponents : BOT_PROFILES).map((b) => (
               <div key={b.name} className="rounded-md bg-slate-900/70 px-2 py-1.5" title={b.style}>

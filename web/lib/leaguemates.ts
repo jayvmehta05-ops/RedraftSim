@@ -18,6 +18,8 @@ const MAX_BIAS = 8;
 export interface LeaguemateProfile extends BotProfile {
   managerId: string;
   picksSeen: number;
+  /** -2 (never trades) .. +2 (trades anything); set manually in the leaguemate editor */
+  tradeOpenness?: number;
 }
 
 export function buildLeaguemateBots(league: ImportedLeague): LeaguemateProfile[] {

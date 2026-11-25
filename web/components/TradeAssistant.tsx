@@ -9,6 +9,7 @@ import {
   type Horizon, type Partner, type TradeEval, type Valued, evaluateTrade, findTrades, playerValue, positionStrength,
 } from "@/lib/trade";
 import { IconSwap } from "./icons";
+import { resolveRoster, unmatchedCount } from "@/lib/rosters";
 import { PosBadge, fmt } from "./ui";
 
 interface Props {
@@ -21,6 +22,7 @@ interface Props {
   onOpenSettings: () => void;
   onLeagueRefreshed: (l: ImportedLeague) => void;
   onChooseManager: (id: string | null) => void;
+  onOpenEditor: () => void;
 }
 
 const ESPN_AUTH_KEY = "redraft27.espnAuth";
@@ -86,7 +88,7 @@ function Empty({ title, body, action, error }: { title: string; body: string; ac
   );
 }
 
-export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, onOpenSettings, onLeagueRefreshed, onChooseManager }: Props) {
+export default function TradeAssistant({ board, cfg, league, myManager, leaguemates, weeksLeft, onOpenSettings, onLeagueRefreshed, onChooseManager, onOpenEditor }: Props) {
   const [horizon, setHorizon] = useState<Horizon>(weeksLeft > 2 ? "ros" : "next");
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -102,9 +104,9 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
   const teams = useMemo(() => {
     if (!league?.rosters) return [];
     return league.rosters.map((r) => {
-      const players = r.playerIds.map((id) => (r.idType === "espn" ? byEspn.get(id) : byId.get(id))).filter((p): p is RankedPlayer => !!p);
+      const players = resolveRoster(r, byId, byEspn);
       const roster: Valued[] = players.map((p) => ({ p, v: playerValue(p, horizon, weeksLeft) }));
-      return { id: r.managerId, name: names.get(r.managerId) ?? `Team ${r.managerId}`, roster, unmatched: r.playerIds.length - players.length };
+      return { id: r.managerId, name: names.get(r.managerId) ?? `Team ${r.managerId}`, roster, unmatched: unmatchedCount(r, byId, byEspn) };
     });
   }, [league, byId, byEspn, names, horizon, weeksLeft]);
 
@@ -118,8 +120,10 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
 
   const leagueAvg = useMemo(() => {
     const sums = { QB: 0, RB: 0, WR: 0, TE: 0 } as Record<Pos, number>;
-    teams.forEach((t) => { const s = positionStrength(t.roster, cfg); POSITIONS.forEach((p) => (sums[p] += s[p])); });
-    POSITIONS.forEach((p) => (sums[p] /= Math.max(teams.length, 1)));
+    // Only teams with players count (hand-made leagues may have empty rosters)
+    const filled = teams.filter((t) => t.roster.length > 0);
+    filled.forEach((t) => { const s = positionStrength(t.roster, cfg); POSITIONS.forEach((p) => (sums[p] += s[p])); });
+    POSITIONS.forEach((p) => (sums[p] /= Math.max(filled.length, 1)));
     return sums;
   }, [teams, cfg]);
 
@@ -154,6 +158,10 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
   if (!league.rosters) {
     return <Empty error={refreshError} title="Load your league's rosters" body={`${league.name} was imported before rosters were supported. Refresh to load every team's current roster.`}
       action={<button onClick={refresh} disabled={refreshing} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-60">{refreshing ? "Loading…" : "Load rosters"}</button>} />;
+  }
+  if (league.rosters.every((r) => !r.playerIds.length && !(r.manualIds ?? []).length)) {
+    return <Empty error={refreshError} title="Add your league's rosters" body="This league was set up by hand, so it has no rosters yet. Add each team's players in the leaguemate editor."
+      action={<button onClick={onOpenEditor} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950">Edit rosters</button>} />;
   }
   if (!me) {
     return <Empty error={refreshError} title="Which team is yours?" body="Pick your team so the assistant knows whose lineup to improve."
@@ -197,9 +205,14 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
               className={`rounded-md px-3 py-1.5 text-xs font-semibold disabled:opacity-40 ${horizon === h ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>{label}</button>
           ))}
         </div>
-        <button onClick={refresh} disabled={refreshing} className="ml-auto rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-60">
-          {refreshing ? "Refreshing…" : "Refresh rosters"}
+        <button onClick={onOpenEditor} className="ml-auto rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700">
+          Edit leaguemates &amp; rosters
         </button>
+        {league.provider !== "manual" && (
+          <button onClick={refresh} disabled={refreshing} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 disabled:opacity-60">
+            {refreshing ? "Refreshing…" : "Refresh rosters"}
+          </button>
+        )}
         {refreshError && <span className="w-full text-xs text-rose-300">{refreshError}</span>}
       </div>
 

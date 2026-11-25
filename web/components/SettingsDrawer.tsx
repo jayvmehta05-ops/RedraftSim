@@ -17,11 +17,12 @@ interface Props {
   onImport: (league: ImportedLeague | null) => void;
   myManager: string | null;
   onChooseManager: (id: string | null) => void;
+  onOpenEditor: () => void;
 }
 
 const ESPN_AUTH_KEY = "redraft27.espnAuth";
 
-function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Props, "league" | "onImport" | "myManager" | "onChooseManager">) {
+function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEditor }: Pick<Props, "league" | "onImport" | "myManager" | "onChooseManager" | "onOpenEditor">) {
   const [provider, setProvider] = useState<"sleeper" | "espn">("sleeper");
   const [id, setId] = useState("");
   const [season, setSeason] = useState(SOURCE);
@@ -85,7 +86,7 @@ function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Pro
         <div className="rounded-lg bg-emerald-500/10 p-3 ring-1 ring-emerald-500/30">
           <div className="text-sm font-semibold text-white">{league.name}</div>
           <div className="text-xs text-slate-400">
-            {league.provider === "sleeper" ? "Sleeper" : "ESPN"} · {league.season} · {league.teams} teams · {league.drafts.length} past draft{league.drafts.length === 1 ? "" : "s"} ({picks} picks)
+            {league.provider === "sleeper" ? "Sleeper" : league.provider === "espn" ? "ESPN" : "Set up by hand"} · {league.season} · {league.teams} teams · {league.drafts.length} past draft{league.drafts.length === 1 ? "" : "s"} ({picks} picks)
           </div>
         </div>
         {league.managers.length > 0 && (
@@ -103,7 +104,10 @@ function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Pro
             {league.notes.map((n) => <li key={n}>• {n}</li>)}
           </ul>
         )}
-        <button onClick={() => onImport(null)} className="mt-3 text-xs text-slate-400 underline hover:text-white">
+        <button onClick={onOpenEditor} className="mt-3 w-full rounded-lg bg-slate-800 py-2 text-sm font-semibold text-slate-200 ring-1 ring-slate-700 hover:bg-slate-700">
+          Describe leaguemates &amp; edit rosters
+        </button>
+        <button onClick={() => onImport(null)} className="mt-3 block text-xs text-slate-400 underline hover:text-white">
           Remove league and go back to the site defaults
         </button>
       </div>
@@ -164,6 +168,9 @@ function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Pro
         </div>
       )}
       {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+      <button onClick={onOpenEditor} className="mt-3 text-xs text-emerald-400 hover:underline">
+        No import? Set up your league and leaguemates by hand →
+      </button>
     </div>
   );
 }
@@ -194,7 +201,7 @@ function Seg({ label, hint, value, options: preset, onPick }: {
   );
 }
 
-export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement, league, onImport, myManager, onChooseManager }: Props) {
+export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement, league, onImport, myManager, onChooseManager, onOpenEditor }: Props) {
   const set = (patch: Partial<Toggles>) => onChange({ ...toggles, ...patch });
   const r = cfg.roster;
   return (
@@ -215,7 +222,7 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
           <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Close settings">✕</button>
         </div>
         <div className="flex-1 divide-y divide-slate-800 overflow-y-auto px-5">
-          <LeagueImport league={league} onImport={onImport} myManager={myManager} onChooseManager={onChooseManager} />
+          <LeagueImport league={league} onImport={onImport} myManager={myManager} onChooseManager={onChooseManager} onOpenEditor={onOpenEditor} />
           <Seg label="FLEX spots" hint="RB / WR / TE" value={toggles.flexCount}
             options={[{ v: 1, label: "1 FLEX" }, { v: 2, label: "2 FLEX" }]} onPick={(v) => set({ flexCount: v })} />
           <Seg label="Superflex" hint="flex spot a QB can fill" value={toggles.superflex}
