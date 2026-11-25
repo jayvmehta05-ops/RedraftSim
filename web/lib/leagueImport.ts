@@ -225,7 +225,7 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
       unmodeled += 1;
     }
   }
-  if (unmodeled) notes.push(`${unmodeled} other scoring rules (bonuses, kicking, return TDs) aren't modeled`);
+  if (unmodeled) notes.push(`${unmodeled} scoring rules for kickers, return TDs or bonuses aren't modeled. Kickers aren't projected, and return TDs are too rare to change QB/RB/WR/TE values`);
 
   const members = new Map((lg.members ?? []).map((m) => [m.id, m.displayName]));
   const managers = (lg.teams ?? []).map((t) => ({
@@ -236,13 +236,14 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
   const drafts: LeagueDraft[] = [];
   const picks = lg.draftDetail?.drafted ? lg.draftDetail.picks ?? [] : [];
   if (picks.length) {
-    // Look up drafted players' positions in one small filtered request
-    const ids = picks.map((p) => p.playerId);
-    const filt = { players: { filterIds: { value: ids }, limit: ids.length } };
-    const pool = await getJson<{ players: { player: { id: number; fullName: string; defaultPositionId: number } }[] }>(
-      `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leaguedefaults/3?view=kona_player_info`,
-      { headers: { "X-Fantasy-Filter": JSON.stringify(filt) } }).catch(() => ({ players: [] }));
-    const info = new Map(pool.players.map((p) => [p.player.id, p.player]));
+    // Look up drafted players' names and positions in one request. (ESPN rejects a `limit` inside this filter,
+    // so use the lightweight players endpoint with a top-level filterIds.)
+    const ids = Array.from(new Set(picks.map((p) => p.playerId)));
+    const pool = await getJson<{ id: number; fullName: string; defaultPositionId: number }[]>(
+      `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/players?view=players_wl`,
+      { headers: { "X-Fantasy-Filter": JSON.stringify({ filterIds: { value: ids } }) } }).catch(() => []);
+    const info = new Map((Array.isArray(pool) ? pool : []).map((p) => [p.id, p]));
+    if (info.size < ids.length * 0.8) notes.push("Some past draft picks couldn't be matched to players, so leaguemate habits are partly learned");
     drafts.push({
       season: String(season), type: s.draftSettings?.type ?? "snake",
       picks: picks.map((p) => ({

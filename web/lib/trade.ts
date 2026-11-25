@@ -58,7 +58,11 @@ export function lineupValue(roster: Valued[], cfg: LeagueConfig): { total: numbe
     if (x) { starters.push(x); used.add(x.p.id); }
   }
   const bench = roster.filter((x) => !used.has(x.p.id)).sort((a, b) => b.v - a.v);
-  const total = starters.reduce((s, x) => s + x.v, 0) + BENCH_WEIGHT * bench.slice(0, BENCH_DEPTH).reduce((s, x) => s + x.v, 0);
+  // Bench depth only matters for positions that can actually step into the lineup. In a 1-QB league a backup QB
+  // starts only on bye or injury, so he counts for very little; RB/WR/TE backups also cover the FLEX.
+  const benchW = (pos: Pos) => (pos === "QB" && !(cfg.roster.SUPERFLEX ?? 0) ? 0.2 : 1) * BENCH_WEIGHT;
+  const depth = bench.map((x) => x.v * benchW(x.p.pos)).sort((a, b) => b - a).slice(0, BENCH_DEPTH);
+  const total = starters.reduce((s, x) => s + x.v, 0) + depth.reduce((s, v) => s + v, 0);
   return { total, starters, bench };
 }
 
@@ -104,7 +108,8 @@ export function evaluateTrade(
   const theirBefore = before?.theirs ?? lineupValue(theirs, cfg).total;
   const myNew = [...mine.filter((x) => !giveIds.has(x.p.id)), ...theirs.filter((x) => getIds.has(x.p.id))];
   const theirNew = [...theirs.filter((x) => !getIds.has(x.p.id)), ...mine.filter((x) => giveIds.has(x.p.id))];
-  const myAfter = lineupValue(myNew, cfg).total;
+  const myLineupAfter = lineupValue(myNew, cfg);
+  const myAfter = myLineupAfter.total;
   const theirAfter = lineupValue(theirNew, cfg).total;
   const myGain = myAfter - myBefore;
   const theirGain = theirAfter - theirBefore;
@@ -114,7 +119,9 @@ export function evaluateTrade(
   const posList = (ps: RankedPlayer[]) => Array.from(new Set(ps.map((p) => p.pos))).join("/");
   if (give.length > get.length) reasons.push(`Consolidates ${give.length}-for-${get.length} into a better starter`);
   if (get.length > give.length) reasons.push(`Adds depth: ${get.length} players for ${give.length}`);
-  if (myGain > 0) reasons.push(`Upgrades your ${posList(get)} starting spot`);
+  const newStarters = get.filter((p) => myLineupAfter.starters.some((x) => x.p.id === p.id));
+  if (myGain > 0 && newStarters.length) reasons.push(`Upgrades your ${posList(newStarters)} starting spot`);
+  else if (myGain > 0) reasons.push("Adds bench depth");
   if (theirGain > 0) reasons.push(`Fills their ${posList(give)} need, so it helps them too`);
   const early = lean?.posBiasByPhase?.early;
   const loved = give.filter((p) => (early?.[p.pos] ?? 0) >= 2).map((p) => p.pos);
