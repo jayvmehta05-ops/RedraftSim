@@ -309,7 +309,7 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
         {/* available players */}
         <div className="rounded-xl bg-slate-900/60 ring-1 ring-slate-800">
           <div className="flex flex-wrap items-center gap-2 border-b border-slate-800 p-3">
-            <div className="flex rounded-lg bg-slate-900 p-1 ring-1 ring-slate-800">
+            <div className="flex max-w-full overflow-x-auto rounded-lg bg-slate-900 p-1 ring-1 ring-slate-800">
               {(["ALL", ...POSITIONS] as const).map((f) => (
                 <button key={f} onClick={() => setPosFilter(f)}
                   className={`rounded-md px-2.5 py-1 text-xs font-semibold ${posFilter === f ? "bg-slate-700 text-white" : "text-slate-400"}`}>{f}</button>
@@ -317,30 +317,33 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
             </div>
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…"
               className="min-w-0 flex-1 rounded-lg bg-slate-900 px-3 py-1.5 text-sm text-white ring-1 ring-slate-800 placeholder:text-slate-500 focus:outline-none" />
-            {userOnClock && <span className="text-xs font-semibold text-emerald-400">You&apos;re on the clock — pick a player</span>}
+            {userOnClock && <span className="w-full text-xs font-semibold text-emerald-400 sm:w-auto">You&apos;re on the clock — pick a player</span>}
           </div>
           <div className="max-h-[560px] overflow-y-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-slate-900 text-[11px] uppercase tracking-wide text-slate-400">
-                <tr><th className="px-2 py-1.5 text-left">ADP</th><th className="px-2 py-1.5 text-left">Player</th><th className="px-2 py-1.5 text-left">Pos</th><th className="px-2 py-1.5 text-left">Tier</th><th className="px-2 py-1.5 text-left">PPG</th><th className="px-2 py-1.5 text-left">VORP</th><th /></tr>
+                <tr><th className="hidden px-2 py-1.5 text-left sm:table-cell">ADP</th><th className="px-2 py-1.5 text-left">Player</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Pos</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Tier</th><th className="px-2 py-1.5 text-left">PPG</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">VORP</th><th /></tr>
               </thead>
               <tbody>
                 {list.map((p) => (
                   <tr key={p.id} className={`border-t border-slate-800/70 ${suggestedIds.has(p.id) ? "bg-emerald-500/10" : ""}`}>
-                    <td className="px-2 py-1.5 tabular-nums text-slate-400">{p.cur.adp}</td>
+                    <td className="hidden px-2 py-1.5 tabular-nums text-slate-400 sm:table-cell">{p.cur.adp}</td>
                     <td className="px-2 py-1.5">
                       <span className="font-medium text-white">{p.name}</span>
                       <span className="ml-1.5 text-[11px] text-slate-500">{p.rookie ? `R${yy(TARGET)}` : p.team}</span>
                       <span className="ml-1.5"><Flags flags={p.flags.filter((f) => f !== "rookie")} notes={p.notes} /></span>
                       {suggestedIds.has(p.id) && <span className="ml-1.5 rounded bg-emerald-500/20 px-1 text-[10px] font-semibold text-emerald-300">SUGGESTED</span>}
+                      <div className="mt-0.5 flex items-center gap-1.5 text-[10px] text-slate-500 sm:hidden">
+                        <PosBadge pos={p.pos} rank={p.cur.posRank} /><TierBadge tier={p.cur.tier} /> ADP {p.cur.adp} · VORP {fmt(p.cur.vorp, 0)}
+                      </div>
                     </td>
-                    <td className="px-2 py-1.5"><PosBadge pos={p.pos} rank={p.cur.posRank} /></td>
-                    <td className="px-2 py-1.5"><TierBadge tier={p.cur.tier} /></td>
+                    <td className="hidden px-2 py-1.5 sm:table-cell"><PosBadge pos={p.pos} rank={p.cur.posRank} /></td>
+                    <td className="hidden px-2 py-1.5 sm:table-cell"><TierBadge tier={p.cur.tier} /></td>
                     <td className="px-2 py-1.5 tabular-nums text-slate-200">{fmt(p.cur.ppg)}</td>
-                    <td className="px-2 py-1.5 tabular-nums text-slate-300">{fmt(p.cur.vorp, 0)}</td>
+                    <td className="hidden px-2 py-1.5 tabular-nums text-slate-300 sm:table-cell">{fmt(p.cur.vorp, 0)}</td>
                     <td className="px-2 py-1.5 text-right">
                       <button disabled={!userOnClock} onClick={() => draft(p.id)}
-                        className="rounded-md bg-emerald-500 px-2.5 py-1 text-xs font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-600">
+                        className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-600">
                         Draft
                       </button>
                     </td>

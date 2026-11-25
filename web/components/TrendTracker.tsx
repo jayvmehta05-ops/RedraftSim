@@ -18,14 +18,14 @@ interface Mover {
 
 function List({ title, rows, tone }: { title: string; rows: Mover[]; tone: "up" | "down" }) {
   return (
-    <div className="rounded-xl bg-slate-900/60 ring-1 ring-slate-800">
+    <div className="overflow-hidden rounded-xl bg-slate-900/60 ring-1 ring-slate-800">
       <h3 className={`border-b border-slate-800 px-4 py-2.5 text-sm font-semibold ${tone === "up" ? "text-emerald-400" : "text-rose-400"}`}>{title}</h3>
       {rows.length === 0 ? (
         <p className="px-4 py-6 text-sm text-slate-500">No movers in this window.</p>
       ) : (
         <table className="w-full text-sm">
           <thead className="text-[11px] uppercase tracking-wide text-slate-500">
-            <tr><th className="px-3 py-1.5 text-left">Player</th><th className="px-2 py-1.5 text-left">ADP</th><th className="px-2 py-1.5 text-left">Δ</th><th className="px-2 py-1.5 text-left">Proj PPG</th><th className="px-2 py-1.5 text-left">Trend</th></tr>
+            <tr><th className="px-3 py-1.5 text-left">Player</th><th className="px-2 py-1.5 text-left">ADP</th><th className="px-2 py-1.5 text-left">Δ</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Proj PPG</th><th className="hidden px-2 py-1.5 text-left sm:table-cell">Trend</th></tr>
           </thead>
           <tbody>
             {rows.map((m) => (
@@ -39,8 +39,8 @@ function List({ title, rows, tone }: { title: string; rows: Mover[]; tone: "up" 
                 </td>
                 <td className="px-2 py-1.5 text-xs tabular-nums text-slate-400">{Math.round(m.from)} → <span className="text-slate-200">{Math.round(m.to)}</span></td>
                 <td className="px-2 py-1.5 text-xs"><Delta value={m.change} /></td>
-                <td className="px-2 py-1.5 text-xs tabular-nums text-slate-400">{fmt(m.ppgFrom)} → <span className="text-slate-200">{fmt(m.ppgTo)}</span></td>
-                <td className="px-2 py-1.5"><Sparkline values={m.series} /></td>
+                <td className="hidden px-2 py-1.5 text-xs tabular-nums text-slate-400 sm:table-cell">{fmt(m.ppgFrom)} → <span className="text-slate-200">{fmt(m.ppgTo)}</span></td>
+                <td className="hidden px-2 py-1.5 sm:table-cell"><Sparkline values={m.series} /></td>
               </tr>
             ))}
           </tbody>

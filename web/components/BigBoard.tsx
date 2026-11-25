@@ -27,6 +27,71 @@ function StatLine({ p }: { p: RankedPlayer }) {
   );
 }
 
+function Avatar({ p, size = 28 }: { p: RankedPlayer; size?: number }) {
+  return p.headshot ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={thumb(p.headshot)!} alt="" width={size} height={size} style={{ width: size, height: size }}
+      className="shrink-0 rounded-full bg-slate-800 object-cover" loading="lazy" decoding="async" />
+  ) : (
+    <div style={{ width: size, height: size }} className="flex shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-semibold text-slate-500">{p.pos}</div>
+  );
+}
+
+function PlayerDetail({ p }: { p: RankedPlayer }) {
+  return (
+    <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+      <div>
+        <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {TARGET} projected per game · {fmt(p.projGames, 1)} games
+        </div>
+        <StatLine p={p} />
+        <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Why the model moved him</div>
+        <ul className="mt-1 text-xs text-slate-300">
+          {p.notes.length ? p.notes.map((n) => <li key={n}>• {n}</li>) : <li className="text-slate-500">No age / injury / role adjustments</li>}
+        </ul>
+      </div>
+      <div className="space-y-0.5 text-xs text-slate-400 md:text-right">
+        {!p.rookie && <div>{PRIOR}: {p.g25} G · {SOURCE}: {p.g26} G</div>}
+        {!p.rookie && p.g26 > 0 && <div>{SOURCE}: {fmt(p.cur.ppg26)} PPG · targets {pct(p.tgtShare)} · touches {pct(p.touchShare)}</div>}
+        {p.espnAdp != null && <div>ESPN ADP: {fmt(p.espnAdp)}{p.espnOwned != null ? ` · ${p.espnOwned.toFixed(1)}% rostered` : ""}</div>}
+        {p.cur.espnRosPpg != null && <div>ESPN rest-of-{SOURCE} proj: {fmt(p.cur.espnRosPpg)} PPG</div>}
+        {p.rookie && <div>Draft capital tier {p.draftTier}</div>}
+      </div>
+    </div>
+  );
+}
+
+/** Phone layout: one tappable card per player. */
+function PlayerCard({ p, cfg, open, onToggle }: { p: RankedPlayer; cfg: LeagueConfig; open: boolean; onToggle: () => void }) {
+  return (
+    <li className="border-b border-slate-800/70 last:border-0">
+      <button onClick={onToggle} aria-expanded={open} className="flex w-full items-center gap-3 px-3 py-2.5 text-left active:bg-slate-800/50">
+        <div className="w-8 shrink-0 text-center">
+          <div className="text-sm font-bold tabular-nums text-slate-200">{p.cur.rank}</div>
+          <div className="text-[10px]"><Delta value={p.rankDelta} /></div>
+        </div>
+        <Avatar p={p} size={36} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="truncate text-sm font-semibold text-white">{p.name}</span>
+            <Flags flags={p.flags} notes={p.notes} />
+          </div>
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-500">
+            <PosBadge pos={p.pos} rank={p.cur.posRank} />
+            <TierBadge tier={p.cur.tier} />
+            <span className="truncate">{p.rookie ? p.college ?? "Rookie" : p.team} · ADP {roundPick(p.cur.adp, cfg.teams)}</span>
+          </div>
+        </div>
+        <div className="shrink-0 text-right">
+          <div className="text-base font-bold tabular-nums text-white">{fmt(p.cur.ppg)}</div>
+          <div className={`text-[10px] tabular-nums ${p.cur.vorp >= 0 ? "text-emerald-400" : "text-slate-500"}`}>VORP {fmt(p.cur.vorp, 0)}</div>
+        </div>
+      </button>
+      {open && <div className="bg-slate-900/70 px-4 pb-3 pt-1"><PlayerDetail p={p} /></div>}
+    </li>
+  );
+}
+
 function Th({ k, sort, setSort, children, className = "" }: {
   k?: SortKey; sort: SortKey; setSort: (k: SortKey) => void; children: React.ReactNode; className?: string;
 }) {
@@ -93,7 +158,7 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex rounded-lg bg-slate-900 p-1 ring-1 ring-slate-800">
+        <div className="flex max-w-full overflow-x-auto rounded-lg bg-slate-900 p-1 ring-1 ring-slate-800 [scrollbar-width:none]">
           {FILTERS.map((f) => (
             <button key={f} onClick={() => setFilter(f)}
               className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${filter === f ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"}`}>
@@ -105,12 +170,30 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search player, team, college…"
-          className="min-w-0 flex-1 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white ring-1 ring-slate-800 placeholder:text-slate-500 focus:outline-none focus:ring-emerald-500 sm:max-w-xs"
+          className="order-first w-full min-w-0 rounded-lg bg-slate-900 px-3 py-2 text-sm text-white ring-1 ring-slate-800 placeholder:text-slate-500 focus:outline-none focus:ring-emerald-500 sm:order-none sm:w-auto sm:flex-1 sm:max-w-xs"
         />
+        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} aria-label="Sort by"
+          className="rounded-lg bg-slate-900 px-2 py-2 text-xs text-slate-300 ring-1 ring-slate-800 md:hidden">
+          <option value="rank">Sort: Rank</option><option value="adp">Sort: ADP</option><option value="ppg">Sort: PPG</option>
+          <option value="vorp">Sort: VORP</option><option value="delta">Sort: Weekly move</option>
+        </select>
         <span className="text-xs text-slate-500">{rows.length} players{filter === "ALL" && !q ? ` · Top ${size}` : ""}</span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl ring-1 ring-slate-800">
+      <ul className="overflow-hidden rounded-xl bg-slate-950 ring-1 ring-slate-800 md:hidden">
+        {visible.map((p, i) => {
+          const prev = visible[i - 1];
+          const tierBreak = showTierBreaks && prev && prev.cur.tier !== p.cur.tier && filter === "ALL";
+          return (
+            <Fragment key={p.id}>
+              {tierBreak && <li className="bg-slate-900/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Tier {p.cur.tier}</li>}
+              <PlayerCard p={p} cfg={cfg} open={open === p.id} onToggle={() => setOpen(open === p.id ? null : p.id)} />
+            </Fragment>
+          );
+        })}
+      </ul>
+
+      <div className="hidden overflow-x-auto rounded-xl ring-1 ring-slate-800 md:block">
         <table className={`w-full ${showEspn ? "min-w-[1040px]" : "min-w-[960px]"} border-collapse text-sm`}>
           <thead className="sticky top-0 z-10 bg-slate-900">
             <tr className="border-b border-slate-800">
@@ -153,12 +236,7 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
                     </td>
                     <td className="px-2 py-2">
                       <div className="flex items-center gap-2">
-                        {p.headshot ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={thumb(p.headshot)!} alt="" width={28} height={28} className="h-7 w-7 rounded-full bg-slate-800 object-cover" loading="lazy" decoding="async" />
-                        ) : (
-                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-[10px] text-slate-500">{p.pos}</div>
-                        )}
+                        <Avatar p={p} />
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="truncate font-medium text-white">{p.name}</span>
@@ -193,25 +271,7 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
                   {open === p.id && (
                     <tr className="border-b border-slate-800 bg-slate-900/70">
                       <td colSpan={cols} className="px-4 py-3">
-                        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-                          <div>
-                            <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                              {TARGET} projected per game · {fmt(p.projGames, 1)} games
-                            </div>
-                            <StatLine p={p} />
-                            <div className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Model adjustments</div>
-                            <ul className="mt-1 text-xs text-slate-300">
-                              {p.notes.length ? p.notes.map((n) => <li key={n}>• {n}</li>) : <li className="text-slate-500">No age / injury / role adjustments</li>}
-                            </ul>
-                          </div>
-                          <div className="text-xs text-slate-400 md:text-right">
-                            {!p.rookie && <div>{PRIOR}: {p.g25} G · {SOURCE}: {p.g26} G</div>}
-                            {p.espnAdp != null && <div>ESPN ADP: {fmt(p.espnAdp)}{p.espnOwned != null ? ` · ${p.espnOwned.toFixed(1)}% rostered` : ""}</div>}
-                            {p.cur.espnRosPpg != null && <div>ESPN rest-of-{SOURCE} proj: {fmt(p.cur.espnRosPpg)} PPG</div>}
-                            {p.marketRank != null && <div>Market rank: {p.marketRank}</div>}
-                            {p.rookie && <div>Draft capital tier {p.draftTier}</div>}
-                          </div>
-                        </div>
+                        <PlayerDetail p={p} />
                       </td>
                     </tr>
                   )}

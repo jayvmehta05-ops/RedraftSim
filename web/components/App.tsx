@@ -11,14 +11,16 @@ import LiveDraft from "./LiveDraft";
 import MockDraft from "./MockDraft";
 import SettingsDrawer from "./SettingsDrawer";
 import TrendTracker from "./TrendTracker";
+import Welcome from "./Welcome";
+import { IconBoard, IconKeeper, IconLive, IconMock, IconSettings, IconTrend, Logo } from "./icons";
 import { TARGET } from "@/lib/season";
 
 const TABS = [
-  { id: "board", label: `${TARGET} Big Board` },
-  { id: "mock", label: "Mock Draft Room" },
-  { id: "live", label: "Live Draft" },
-  { id: "keepers", label: "Keepers" },
-  { id: "trends", label: "Weekly Trends" },
+  { id: "board", label: `${TARGET} Big Board`, short: "Board", icon: IconBoard },
+  { id: "mock", label: "Mock Draft", short: "Mock", icon: IconMock },
+  { id: "live", label: "Live Draft", short: "Live", icon: IconLive },
+  { id: "keepers", label: "Keepers", short: "Keepers", icon: IconKeeper },
+  { id: "trends", label: "Trends", short: "Trends", icon: IconTrend },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 const STORAGE_KEY = "redraft27.toggles";
@@ -117,39 +119,52 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
     ...(cfg.scoring.te_premium ? [`TE +${cfg.scoring.te_premium}`] : []),
   ];
 
+  const go = (t: Tab) => {
+    setTab(t);
+    window.scrollTo({ top: 0 });
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200">
-      <header className="border-b border-slate-800 bg-slate-950/90 backdrop-blur">
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-6 gap-y-3 px-4 py-4">
-          <div>
-            <h1 className="text-lg font-bold tracking-tight text-white">
-              <span className="text-emerald-400">{TARGET}</span> Redraft Projections &amp; Mock Draft
+      <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
+        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+          <Logo className="h-8 w-8 shrink-0" />
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-bold leading-tight tracking-tight text-white sm:text-lg">
+              <span className="text-emerald-400">{TARGET}</span> Redraft Projections<span className="hidden sm:inline"> &amp; Mock Draft</span>
             </h1>
-            <p className="text-xs text-slate-500">
-              Data through {m.sourceSeason} Week {m.throughWeek} · updated {updated} · auto-refreshes every Tuesday
+            <p className="truncate text-[11px] text-slate-500">
+              Through {m.sourceSeason} Week {m.throughWeek} · updated {updated}<span className="hidden sm:inline"> · refreshes every Tuesday</span>
             </p>
           </div>
-          <nav className="flex rounded-xl bg-slate-900 p-1 ring-1 ring-slate-800">
+          <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Sections">
             {TABS.map((t) => (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                className={`rounded-lg px-3.5 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>
+              <button key={t.id} onClick={() => go(t.id)} aria-current={tab === t.id ? "page" : undefined}
+                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
                 {t.label}
               </button>
             ))}
           </nav>
-          <div className="ml-auto flex flex-wrap items-center gap-2">
-            {chips.map((c) => (
-              <span key={c} className="rounded-full bg-slate-900 px-2.5 py-1 text-[11px] text-slate-300 ring-1 ring-slate-800">{c}</span>
+          <div className="ml-auto lg:hidden"><FeedbackButton inline context={{ tab, league: league ? league.provider : "none" }} /></div>
+          <button onClick={() => setSettingsOpen(true)}
+            className={`flex shrink-0 lg:ml-auto items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ring-1 transition ${nonDefault || league ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/40 hover:bg-emerald-500/20" : "bg-slate-900 text-slate-200 ring-slate-700 hover:bg-slate-800"}`}>
+            <IconSettings className="h-4 w-4" />
+            <span className="hidden sm:inline">{league ? "Your league" : "League settings"}</span>
+          </button>
+        </div>
+        <div className="mx-auto max-w-7xl px-4 pb-2.5">
+          <button onClick={() => setSettingsOpen(true)} className="-mx-1 flex max-w-full gap-1.5 overflow-x-auto px-1 [scrollbar-width:none]" aria-label="Edit league settings">
+            {chips.map((c, i) => (
+              <span key={c} className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] ring-1 ${i === 0 && league ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/30" : "bg-slate-900 text-slate-300 ring-slate-800"}`}>{c}</span>
             ))}
-            <button onClick={() => setSettingsOpen(true)}
-              className={`rounded-lg px-3 py-1.5 text-sm font-semibold ring-1 ${nonDefault ? "bg-amber-500/15 text-amber-300 ring-amber-500/40" : "bg-slate-900 text-slate-200 ring-slate-700 hover:bg-slate-800"}`}>
-              ⚙ Settings{nonDefault ? " (custom)" : ""}
-            </button>
-          </div>
+          </button>
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 py-5">
+      <main className="mx-auto max-w-7xl px-4 pb-28 pt-5 lg:pb-10">
+        {tab === "board" && (
+          <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} />
+        )}
         {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} showEspn={m.publication?.show_espn_fields !== false} />}
         {tab === "mock" && <MockDraft board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} />}
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
@@ -157,7 +172,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         {tab === "trends" && <TrendTracker board={board} trends={trends} throughWeek={m.throughWeek} />}
       </main>
 
-      <footer className="mx-auto max-w-7xl px-4 pb-8 text-[11px] leading-relaxed text-slate-600">
+      <footer className="mx-auto max-w-7xl px-4 pb-28 text-[11px] leading-relaxed text-slate-600 lg:pb-8">
         <div className="mb-2 flex gap-4 text-xs">
           <a href="/guide" className="text-emerald-400/80 hover:text-emerald-300">How it works</a>
           <a href="/accuracy" className="text-emerald-400/80 hover:text-emerald-300">How accurate are these projections?</a>
@@ -168,6 +183,19 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         nflverse weekly player stats, DynastyProcess ID map,
         an editable list of the incoming {TARGET} rookie class. Projections are model estimates, not guarantees.
       </footer>
+
+      {/* Phone / tablet: app-style bottom tabs */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-800 bg-slate-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Sections">
+        <div className="mx-auto grid max-w-lg grid-cols-5">
+          {TABS.map(({ id, short, icon: Icon }) => (
+            <button key={id} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined}
+              className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${tab === id ? "text-emerald-400" : "text-slate-500"}`}>
+              <Icon className="h-5 w-5" />
+              {short}
+            </button>
+          ))}
+        </div>
+      </nav>
 
       <FeedbackButton context={{ tab, league: league ? league.provider : "none" }} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} toggles={toggles} defaults={defaults}

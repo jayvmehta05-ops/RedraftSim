@@ -23,7 +23,7 @@ const KINDS: { v: Kind; label: string }[] = [
 ];
 
 /** Floating "Feedback" button + form: 0-10 recommend score, category, comment, optional email. */
-export default function FeedbackButton({ context }: { context?: Record<string, string> }) {
+export default function FeedbackButton({ context, inline = false }: { context?: Record<string, string>; inline?: boolean }) {
   const [open, setOpen] = useState(false);
   const [score, setScore] = useState<number | null>(null);
   const [kind, setKind] = useState<Kind>("general");
@@ -48,10 +48,19 @@ export default function FeedbackButton({ context }: { context?: Record<string, s
 
   return (
     <>
-      <button onClick={() => { setOpen(true); setState("idle"); }}
-        className="fixed bottom-4 right-4 z-30 rounded-full bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950 shadow-lg hover:bg-emerald-400">
-        Feedback
-      </button>
+      {inline ? (
+        <button onClick={() => { setOpen(true); setState("idle"); }} aria-label="Send feedback"
+          className="flex shrink-0 items-center rounded-lg bg-slate-900 p-2 text-slate-300 ring-1 ring-slate-700 hover:bg-slate-800">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4" aria-hidden>
+            <path d="M4 5h16v11H9l-5 4z" /><path d="M8 9h8M8 12h5" />
+          </svg>
+        </button>
+      ) : (
+        <button onClick={() => { setOpen(true); setState("idle"); }}
+          className="fixed bottom-5 right-5 z-30 hidden rounded-full bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950 shadow-lg shadow-emerald-950/50 hover:bg-emerald-400 lg:block">
+          Feedback
+        </button>
+      )}
       {open && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setOpen(false)}>
           <div className="w-full max-w-md rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-700" onClick={(e) => e.stopPropagation()}>
