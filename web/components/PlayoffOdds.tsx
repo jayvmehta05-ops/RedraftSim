@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { type PlayoffOdds as Odds, simulatePlayoffs } from "@/lib/playoffs";
 import { lineupValue } from "@/lib/trade";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
+import { encodeOdds } from "@/lib/share";
+import ShareButton from "./ShareButton";
 import { useLeagueTeams } from "./useLeagueTeams";
 
 const pct = (x: number) => (x >= 0.995 ? ">99%" : x <= 0.005 ? (x === 0 ? "0%" : "<1%") : `${Math.round(x * 100)}%`);
@@ -37,20 +39,32 @@ export default function PlayoffOdds({ board, cfg, league, myManager, weeksLeft, 
       </div>
     );
   }
-  return <OddsView res={res} myManager={myManager} />;
+  return <OddsView res={res} myManager={myManager} leagueName={league.name} />;
 }
 
-function OddsView({ res, myManager }: { res: Odds; myManager: string | null }) {
+function OddsView({ res, myManager, leagueName }: { res: Odds; myManager: string | null; leagueName: string }) {
   const me = res.me;
   const hasByes = res.teams.some((t) => t.bye > 0);
   const n = res.teams.length;
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-slate-900 px-4 py-3 ring-1 ring-slate-800">
-        <div className="text-sm font-semibold text-white">Playoff odds</div>
-        <div className="text-[11px] text-slate-500">
-          {res.sims.toLocaleString("en-US")} simulated finishes · {res.weeksLeft > 0 ? `${res.weeksLeft} regular-season week${res.weeksLeft === 1 ? "" : "s"} left` : "regular season complete"} · top {res.playoffTeams} make the playoffs
+      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 ring-1 ring-slate-800">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-white">Playoff odds</div>
+          <div className="text-[11px] text-slate-500">
+            {res.sims.toLocaleString("en-US")} simulated finishes · {res.weeksLeft > 0 ? `${res.weeksLeft} regular-season week${res.weeksLeft === 1 ? "" : "s"} left` : "regular season complete"} · top {res.playoffTeams} make the playoffs
+          </div>
         </div>
+        <ShareButton label="Share card" title={`${leagueName} playoff odds`}
+          text={me ? `My playoff odds: ${pct(me.odds)}${me.opponent && me.ifWin != null && me.ifLose != null ? `. Beat ${me.opponent}: ${pct(me.ifWin)}, lose: ${pct(me.ifLose)}` : ""}.` : `Playoff odds for ${leagueName}`}
+          build={() => {
+            const mine = res.teams.find((t) => t.id === myManager);
+            return `/odds/${encodeOdds({
+              v: 1, lg: leagueName, wk: res.week, p: res.playoffTeams, me: mine?.name,
+              st: me?.opponent && me.ifWin != null && me.ifLose != null ? [me.opponent, Math.round(me.ifWin * 1000), Math.round(me.ifLose * 1000)] : undefined,
+              t: res.teams.map((t) => [t.name, t.wins, t.losses, Math.round(t.playoff * 1000), Math.round(t.title * 1000)]),
+            })}`;
+          }} />
       </div>
 
       {me && (

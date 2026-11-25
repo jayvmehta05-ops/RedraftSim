@@ -2,6 +2,8 @@
 
 import { useMemo } from "react";
 import { luckTable } from "@/lib/luck";
+import { encodeLuck } from "@/lib/share";
+import ShareButton from "./ShareButton";
 import type { ImportedLeague } from "@/lib/types";
 import { fmt } from "./ui";
 
@@ -43,11 +45,19 @@ export default function LuckMeter({ league, myManager, onRefresh, refreshing }: 
 
   return (
     <section className="space-y-4">
-      <div className="rounded-xl bg-slate-900 px-4 py-3 ring-1 ring-slate-800">
-        <div className="text-sm font-semibold text-white">Luck meter · {league.name}</div>
-        <div className="text-[11px] text-slate-500">
-          Through {weeks} completed week{weeks === 1 ? "" : "s"}. All-play = your score against every team, every week. Luck = actual wins minus the wins your scores earned.
+      <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 ring-1 ring-slate-800">
+        <div className="min-w-0 flex-1">
+          <div className="text-sm font-semibold text-white">Luck meter · {league.name}</div>
+          <div className="text-[11px] text-slate-500">
+            Through {weeks} completed week{weeks === 1 ? "" : "s"}. All-play = your score against every team, every week. Luck = actual wins minus the wins your scores earned.
+          </div>
         </div>
+        <ShareButton label="Share card" title={`${league.name} luck meter`}
+          text={me ? `I'm ${me.wins}-${me.losses} but my scores earned ${me.expectedWins.toFixed(1)} wins. Who's the luckiest in ${league.name}?` : `Who's the luckiest team in ${league.name}?`}
+          build={() => `/luck/${encodeLuck({
+            v: 1, lg: league.name, wk: weeks, me: me?.name,
+            t: rows.map((r) => [r.name, r.wins, r.losses, r.allPlay.wins, r.allPlay.losses, Math.round(r.expectedWins * 10), Math.round(r.luck * 10)]),
+          })}`} />
       </div>
 
       {me && (
