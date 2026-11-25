@@ -98,6 +98,7 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
       if (saved?.espnS2) {
         // eslint-disable-next-line react-hooks/set-state-in-effect
         setEspnS2(saved.espnS2);
+        setShowPrivate(true);
         setSwid(saved.swid ?? "");
         setRemember(true);
       }
@@ -105,6 +106,15 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
       /* storage unavailable */
     }
   }, []);
+
+  // Accept a bare ID or a pasted league link (ESPN ...?leagueId=123, Sleeper .../league/123)
+  const parsedId = (() => {
+    const t = id.trim();
+    const m = t.match(/leagueId=(\d+)/i) ?? t.match(/\/league\/(\d+)/i) ?? t.match(/^([A-Za-z0-9_-]{3,40})$/) ?? t.match(/(\d{5,})/);
+    return m ? m[1] : "";
+  })();
+  const halfCookies = provider === "espn" && !!espnS2.trim() !== !!swid.trim();
+  const canImport = !busy && !!parsedId && !halfCookies;
 
   const run = async () => {
     setBusy(true);
@@ -121,7 +131,7 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          provider, id: id.trim(), season,
+          provider, id: parsedId, season,
           ...(usePrivate ? { espnS2: espnS2.trim(), swid: swid.trim() } : {}),
         }),
       });
@@ -198,23 +208,25 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
           </button>
         ))}
       </div>
-      <div className="mt-2 flex gap-2">
-        <input value={id} onChange={(e) => setId(e.target.value)} placeholder="League ID (from the league URL)"
-          className="min-w-0 flex-1 rounded-md bg-slate-800 px-2 py-1.5 text-sm text-white ring-1 ring-slate-700 placeholder:text-slate-500 focus:outline-none focus:ring-emerald-500" />
-        {provider === "espn" && (
-          <select value={season} onChange={(e) => setSeason(Number(e.target.value))}
-            className="rounded-md bg-slate-800 px-2 py-1.5 text-sm text-slate-200 ring-1 ring-slate-700">
-            {[SOURCE, PRIOR].map((y) => <option key={y} value={y}>{y}</option>)}
-          </select>
-        )}
-      </div>
-      <button disabled={busy || id.trim().length < 3} onClick={run}
-        className="mt-2 w-full rounded-lg bg-emerald-500 py-2 text-sm font-bold text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">
-        {busy ? "Importing…" : "Import league"}
-      </button>
+      <form onSubmit={(e) => { e.preventDefault(); if (canImport) run(); }}>
+      <label className="mt-2 block text-[11px] text-slate-400">
+        League ID or the league&apos;s web address
+        <div className="mt-1 flex gap-2">
+          <input value={id} onChange={(e) => setId(e.target.value)} inputMode="url"
+            placeholder={provider === "espn" ? "e.g. 1198249072 or the ESPN league link" : "e.g. 1180208789911158784 or the Sleeper league link"}
+            className="min-w-0 flex-1 rounded-md bg-slate-800 px-2 py-1.5 text-sm text-white ring-1 ring-slate-700 placeholder:text-slate-500 focus:outline-none focus:ring-emerald-500" />
+          {provider === "espn" && (
+            <select value={season} onChange={(e) => setSeason(Number(e.target.value))} aria-label="Season"
+              className="rounded-md bg-slate-800 px-2 py-1.5 text-sm text-slate-200 ring-1 ring-slate-700">
+              {[SOURCE, PRIOR].map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          )}
+        </div>
+        {id.trim() && parsedId !== id.trim() && parsedId && <span className="mt-1 block text-[10px] text-emerald-400">Found league ID {parsedId}</span>}
+      </label>
       {provider === "espn" && (
         <div className="mt-2">
-          <button onClick={() => setShowPrivate((v) => !v)} className="text-xs text-emerald-400 hover:underline">
+          <button type="button" onClick={() => setShowPrivate((v) => !v)} className="text-xs text-emerald-400 hover:underline">
             {showPrivate ? "▾" : "▸"} Private league? Use your ESPN login
           </button>
           {showPrivate && (
@@ -240,6 +252,11 @@ function LeagueImport({ league, onImport, myManager, onChooseManager, onOpenEdit
           )}
         </div>
       )}
+      <button type="submit" disabled={!canImport}
+        className="mt-3 w-full rounded-lg bg-emerald-500 py-2.5 text-sm font-bold text-slate-950 disabled:bg-slate-800 disabled:text-slate-500">
+        {busy ? "Importing…" : !parsedId ? "Enter your league ID above" : halfCookies ? "Add both espn_s2 and SWID" : "Import league"}
+      </button>
+      </form>
       {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
       <button onClick={onOpenEditor} className="mt-3 text-xs text-emerald-400 hover:underline">
         No import? Set up your league and leaguemates by hand →
