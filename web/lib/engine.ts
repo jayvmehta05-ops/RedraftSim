@@ -128,6 +128,7 @@ export function computeBoard(players: RawPlayer[], cfg: LeagueConfig): { board: 
       points: r.points,
       vorp: r.vorp,
       settingsDelta: r.p.rank - r.rank,
+      espnRosPpg: r.p.espnRos ? pointsPerGame(r.p.espnRos, r.p.pos, sc) : null,
     },
   }));
   return { board, replacement };

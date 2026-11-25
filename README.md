@@ -8,7 +8,8 @@ cleanly to Vercel.
 ```
 config/league_settings.json      League rules: teams, roster slots, scoring, projection knobs
 data/rookies_2027.csv            Editable 2027 prospect board (draft-capital tiers, talent grades, overrides)
-data/fantasy_2027.db             SQLite: players, weekly_stats, rookies, ingest_runs, snapshots, projections
+data/fantasy_2027.db             SQLite: players, weekly_stats, espn_players, espn_weekly_proj, espn_market_history,
+                                 rookies, ingest_runs, snapshots, projections
 scripts/common.py                Paths, schema, name matching, scoring
 scripts/update_data.py           Weekly ingestion (Sleeper + nflverse + ID crosswalk + rookies)
 scripts/project_2027.py          2027 projection + VORP engine, weekly snapshots, JSON export
@@ -34,7 +35,8 @@ cd web && npm install && npm run dev       # http://localhost:3000
 | `api.sleeper.app/v1/state/nfl` | Current NFL week |
 | `api.sleeper.app/v1/stats/nfl/regular/{season}/{week}` | Fallback for completed weeks nflverse hasn't published yet |
 | nflverse `stats_player_week_{season}.csv` | 2026 weekly box scores (and 2025 as a prior) |
-| DynastyProcess `db_playerids.csv` | Sleeper ↔ GSIS id crosswalk (then name + position fallback) |
+| ESPN fantasy API `lm-api-reads.fantasy.espn.com/.../leaguedefaults/3?view=kona_player_info` | ESPN ADP, % rostered/started, injury status, weekly projections (public but unofficial; a failed pull keeps last week's ESPN data and falls back to Sleeper's market rank) |
+| DynastyProcess `db_playerids.csv` | Sleeper ↔ GSIS ↔ ESPN id crosswalk (then name + position fallback) |
 
 `nfl_data_py` is deprecated upstream, so the pipeline reads the same nflverse release files directly with pandas.
 
@@ -43,6 +45,9 @@ cd web && npm install && npm run dev       # http://localhost:3000
 1. **Usage and efficiency.** Per-game volume from 2026, recency-weighted (×0.93 per week back), blended with 2025 at 0.4 weight per game.
    Partial games (injury exits) are dropped. Efficiency is regressed toward position averages: catch rate, yards per target/carry/attempt
    by sample size, and TD rates 50% toward league average (`td_regression`).
+   ESPN's weekly projections for the next `espn_lookahead_weeks` (6) weeks the player is projected to play are then blended
+   in at `espn_projection_weight` (30%), so role and depth-chart changes ESPN already sees show up before the box scores catch up.
+   Players ESPN projects for 0 points (IR, inactive) keep the model-only line.
 2. **Age curve.** RBs lose 6/12/20% at ages 28/29/30 (+8%/yr after that), WRs lose 5/10/16% at 30/31/32, TEs lose 5%/yr from 31, QBs lose 4%/yr from 35.
    Year-2 players get +10% (WR/TE), +6% (QB), +5% (RB); Year-3 players get a smaller bump.
 3. **Injuries.** IR/PUP/Out players with ACL, Achilles, Lisfranc, fractures and similar lose projected games plus a little efficiency. Minor IR stints get a small games haircut.
@@ -51,13 +56,15 @@ cd web && npm install && npm run dev       # http://localhost:3000
    `adp_override` pins a rookie's ADP if you want to.
 6. **VORP.** Season points minus the replacement level, which is the average of the 3 players just after the last projected starter at each
    position. Starters = slots × teams, plus FLEX spots given to the best remaining RB/WR/TE. Tiers come from gaps in VORP.
-   ADP = 80% model rank + 20% market rank (Sleeper), expressed as an expected pick number.
+   ADP = 80% model rank + 20% market rank, expressed as an expected pick number. The market is ESPN ADP
+   (`market_source: "espn"`), or Sleeper's `search_rank` if the ESPN pull failed. ESPN freezes its ADP once the season starts, so
+   in-season it reflects 2026 preseason drafts. Each pull is also saved to `espn_market_history` for future ESPN ADP trends.
 
 Each run stores a snapshot (`snapshots` + `projections` tables) keyed by week and a hash of the league settings. The Big Board's
 `Wk Δ` and the Trends tab come from these snapshots.
 
 > **Backfill caveat:** `--backfill` rebuilds earlier weeks from the stats available at that time, but it uses the *current* Sleeper
-> injury/depth-chart/market data. Only snapshots from the weekly runs themselves are true point-in-time records.
+> injury/depth-chart data and ESPN ADP, and ESPN weekly projections as they stand now. Only snapshots from the weekly runs themselves are true point-in-time records.
 
 ## League settings
 

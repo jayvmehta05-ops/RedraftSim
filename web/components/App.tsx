@@ -94,7 +94,9 @@ export default function App({ data, trends, config }: { data: BoardData; trends:
       </main>
 
       <footer className="mx-auto max-w-7xl px-4 pb-8 text-[11px] leading-relaxed text-slate-600">
-        Sources: Sleeper public API (players, injuries, depth charts), nflverse weekly player stats, DynastyProcess ID map,
+        Sources: Sleeper public API (players, injuries, depth charts), ESPN fantasy API (ADP, roster %, rest-of-season
+        projections{m.marketSource === "espn" ? "; ESPN ADP is the market signal" : "; ESPN unavailable, Sleeper rank used as market"}),
+        nflverse weekly player stats, DynastyProcess ID map,
         editable data/rookies_2027.csv. Projections are model estimates, not guarantees.
       </footer>
 

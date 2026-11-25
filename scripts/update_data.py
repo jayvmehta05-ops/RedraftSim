@@ -9,13 +9,15 @@ Sources (all free / public, no keys):
   * Sleeper league state (current week)          https://api.sleeper.app/v1/state/nfl
   * Sleeper weekly stats (fallback for weeks nflverse has not published yet)
   * nflverse weekly player stats                 github.com/nflverse/nflverse-data (stats_player)
-  * DynastyProcess ID crosswalk (sleeper_id <-> gsis_id)
+  * DynastyProcess ID crosswalk (sleeper_id <-> gsis_id <-> espn_id)
+  * ESPN fantasy player pool: ADP, roster %, injury status, weekly projections (public, unofficial)
   * data/rookies_2027.csv (+ optional ROOKIE_SOURCE_URL hook)
 """
 from __future__ import annotations
 
 import argparse
 import io
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -91,17 +93,21 @@ def fetch_players(now: str) -> pd.DataFrame:
         })
     df = pd.DataFrame(rows)
 
-    # Fill missing gsis ids from the DynastyProcess crosswalk.
+    # Fill missing gsis ids from the DynastyProcess crosswalk; also return its ESPN -> Sleeper map.
+    espn_to_sleeper: dict[str, str] = {}
     try:
-        ids = get_csv(ID_MAP_URL)[["sleeper_id", "gsis_id"]].dropna()
-        ids["sleeper_id"] = ids["sleeper_id"].astype(str).str.replace(r"\.0$", "", regex=True)
-        xwalk = dict(zip(ids["sleeper_id"], ids["gsis_id"]))
+        ids = get_csv(ID_MAP_URL)
+        norm = lambda s: s.astype(str).str.replace(r"\.0$", "", regex=True)  # noqa: E731
+        g = ids[["sleeper_id", "gsis_id"]].dropna()
+        xwalk = dict(zip(norm(g["sleeper_id"]), g["gsis_id"]))
         before = df["gsis_id"].notna().sum()
         df["gsis_id"] = df["gsis_id"].fillna(df["player_id"].map(xwalk))
         log(f"gsis ids: {before} from Sleeper, {df['gsis_id'].notna().sum()} after crosswalk")
+        e = ids[["espn_id", "sleeper_id"]].dropna()
+        espn_to_sleeper = dict(zip(norm(e["espn_id"]), norm(e["sleeper_id"])))
     except Exception as e:  # crosswalk is optional; name matching covers the rest
         log(f"WARN id crosswalk unavailable ({e}); falling back to name matching")
-    return df
+    return df, espn_to_sleeper
 
 
 # --------------------------------------------------------------------------- stats
@@ -157,6 +163,78 @@ def upsert_weekly(con, df: pd.DataFrame) -> int:
     con.executemany(f"INSERT OR REPLACE INTO weekly_stats ({','.join(WEEKLY_COLS)}) VALUES ({placeholders})",
                     df.itertuples(index=False, name=None))
     return len(df)
+
+
+# --------------------------------------------------------------------------- ESPN
+ESPN_PLAYERS = ("https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/{season}"
+                "/segments/0/leaguedefaults/3?view=kona_player_info")
+ESPN_POS = {1: "QB", 2: "RB", 3: "WR", 4: "TE"}
+# ESPN stat id -> our component (verified against nflverse box scores)
+ESPN_STAT_IDS = {
+    "0": "pass_att", "1": "pass_cmp", "3": "pass_yds", "4": "pass_td", "20": "pass_int", "19": "pass_2pt",
+    "23": "rush_att", "24": "rush_yds", "25": "rush_td", "26": "rush_2pt",
+    "58": "targets", "53": "rec", "42": "rec_yds", "43": "rec_td", "44": "rec_2pt", "72": "fum_lost",
+}
+
+
+def fetch_espn(con, season: int, players: pd.DataFrame, espn_to_sleeper: dict, now: str) -> str:
+    """ESPN ADP, roster %, injury status and weekly projections. Never fails the run.
+
+    ESPN's fantasy API is public but unofficial; if it errors, the previous ESPN tables are kept
+    and project_2027.py falls back to Sleeper's market rank.
+    """
+    filt = {"players": {"limit": 1500, "filterSlotIds": {"value": [0, 2, 4, 6]},
+                        "sortPercOwned": {"sortPriority": 1, "sortAsc": False}}}
+    try:
+        r = requests.get(ESPN_PLAYERS.format(season=season), timeout=120,
+                         headers={**HEADERS, "X-Fantasy-Filter": json.dumps(filt)})
+        r.raise_for_status()
+        raw = r.json().get("players", [])
+    except Exception as e:
+        log(f"WARN ESPN fetch failed ({e}); keeping previous ESPN data")
+        return f"espn=failed({type(e).__name__})"
+    if len(raw) < 200:
+        log(f"WARN ESPN returned only {len(raw)} players; keeping previous ESPN data")
+        return f"espn=short({len(raw)})"
+
+    name_key = players.assign(k=players["merge_name"] + "|" + players["position"]) \
+        .drop_duplicates("k", keep=False).set_index("k")["player_id"]
+    known = set(players["player_id"])
+    prow, wrows, hrows = [], [], []
+    today = now[:10]
+    for e in raw:
+        p = e.get("player") or {}
+        pos = ESPN_POS.get(p.get("defaultPositionId"))
+        if not pos:
+            continue
+        eid = str(p["id"])
+        sid = espn_to_sleeper.get(eid)
+        if sid not in known:
+            sid = name_key.get(merge_name(p.get("fullName", "")) + "|" + pos)
+        own = p.get("ownership") or {}
+        adp = own.get("averageDraftPosition")
+        adp = float(adp) if adp and adp > 0 else None
+        prow.append((eid, sid, p.get("fullName"), pos, adp, own.get("percentOwned"), own.get("percentStarted"),
+                     own.get("auctionValueAverage"), p.get("injuryStatus"), now))
+        hrows.append((today, eid, sid, adp, own.get("percentOwned"), own.get("percentStarted")))
+        for s in p.get("stats") or []:
+            if s.get("statSourceId") != 1 or s.get("statSplitTypeId") != 1 or s.get("seasonId") != season:
+                continue
+            st = s.get("stats") or {}
+            comp = {c: float(st.get(k, 0) or 0) for k, c in ESPN_STAT_IDS.items()}
+            wrows.append((season, int(s["scoringPeriodId"]), eid, sid, *[comp[c] for c in STAT_COMPONENTS],
+                          float(s.get("appliedTotal") or 0)))
+
+    con.execute("DELETE FROM espn_players")
+    con.executemany("INSERT INTO espn_players VALUES (?,?,?,?,?,?,?,?,?,?)", prow)
+    con.execute("DELETE FROM espn_weekly_proj WHERE season = ?", (season,))
+    con.executemany(f"INSERT OR REPLACE INTO espn_weekly_proj VALUES ({','.join('?' * (5 + len(STAT_COMPONENTS)))})",
+                    wrows)
+    con.executemany("INSERT OR REPLACE INTO espn_market_history VALUES (?,?,?,?,?,?)", hrows)
+    mapped = sum(1 for r in prow if r[1])
+    log(f"ESPN: {len(prow)} players ({mapped} mapped to Sleeper), {sum(1 for r in prow if r[4])} with ADP, "
+        f"{len(wrows)} weekly projection rows")
+    return f"espn_players={len(prow)}; espn_mapped={mapped}"
 
 
 # --------------------------------------------------------------------------- rookies
@@ -230,7 +308,7 @@ def main() -> None:
     sleeper_week = int(state.get("week") or 0) if str(state.get("season")) == str(season) else 18
     log(f"Sleeper state: season={state.get('season')} week={state.get('week')} ({state.get('season_type')})")
 
-    players = fetch_players(now)
+    players, espn_to_sleeper = fetch_players(now)
     log(f"Sleeper players (QB/RB/WR/TE, active or rostered): {len(players)}")
 
     # --- current season from nflverse
@@ -275,6 +353,8 @@ def main() -> None:
     else:
         log(f"nflverse {prior}: {have_prior} rows already stored (use --refresh-prior to reload)")
 
+    espn_note = fetch_espn(con, season, players, espn_to_sleeper, now)
+
     n_rookies = load_rookies(con, now)
     log(f"2027 rookie prospects loaded: {n_rookies}")
 
@@ -283,7 +363,8 @@ def main() -> None:
         "INSERT INTO ingest_runs (run_at, season, sleeper_week, stats_through, players_count, stats_rows, notes) "
         "VALUES (?,?,?,?,?,?,?)",
         (now, season, sleeper_week, stats_through, len(players), n_rows,
-         f"nflverse_through={nflverse_through}; sleeper_fallback_weeks={len(fallback)}; id_match={mapped:.1%}"),
+         f"nflverse_through={nflverse_through}; sleeper_fallback_weeks={len(fallback)}; id_match={mapped:.1%}; "
+         f"{espn_note}"),
     )
     con.commit()
     con.close()

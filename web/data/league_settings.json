@@ -12,7 +12,11 @@
     "FLEX": 1,
     "BENCH": 6
   },
-  "flex_eligible": ["RB", "WR", "TE"],
+  "flex_eligible": [
+    "RB",
+    "WR",
+    "TE"
+  ],
   "scoring": {
     "pass_yd": 0.04,
     "pass_td": 4,
@@ -29,10 +33,34 @@
     "te_premium": 0.0
   },
   "toggles": {
-    "flex_count": { "options": [1, 2], "path": "roster.FLEX" },
-    "ppr": { "options": [1.0, 0.5], "path": "scoring.rec" },
-    "pass_td": { "options": [4, 6], "path": "scoring.pass_td" },
-    "te_premium": { "options": [0.0, 0.5], "path": "scoring.te_premium" }
+    "flex_count": {
+      "options": [
+        1,
+        2
+      ],
+      "path": "roster.FLEX"
+    },
+    "ppr": {
+      "options": [
+        1.0,
+        0.5
+      ],
+      "path": "scoring.rec"
+    },
+    "pass_td": {
+      "options": [
+        4,
+        6
+      ],
+      "path": "scoring.pass_td"
+    },
+    "te_premium": {
+      "options": [
+        0.0,
+        0.5
+      ],
+      "path": "scoring.te_premium"
+    }
   },
   "projection": {
     "board_size": 250,
@@ -40,6 +68,9 @@
     "prior_season_weight": 0.4,
     "td_regression": 0.5,
     "market_adp_weight": 0.2,
-    "base_games": 15.5
+    "base_games": 15.5,
+    "espn_projection_weight": 0.3,
+    "espn_lookahead_weeks": 6,
+    "market_source": "espn"
   }
 }

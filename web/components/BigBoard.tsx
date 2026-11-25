@@ -7,7 +7,7 @@ import { Delta, Flags, PosBadge, TierBadge, fmt, pct } from "./ui";
 
 type Filter = "ALL" | Pos | "ROOKIES";
 const FILTERS: Filter[] = ["ALL", "QB", "RB", "WR", "TE", "ROOKIES"];
-type SortKey = "rank" | "adp" | "ppg" | "vorp" | "ppg26" | "delta";
+type SortKey = "rank" | "adp" | "espn" | "ppg" | "vorp" | "ppg26" | "delta";
 
 function StatLine({ p }: { p: RankedPlayer }) {
   const s = p.proj;
@@ -56,6 +56,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
     const key: Record<SortKey, (p: RankedPlayer) => number> = {
       rank: (p) => p.cur.rank,
       adp: (p) => p.cur.adp,
+      espn: (p) => p.espnAdp ?? 9999,
       ppg: (p) => -p.cur.ppg,
       vorp: (p) => -p.cur.vorp,
       ppg26: (p) => -p.cur.ppg26,
@@ -88,7 +89,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
       </div>
 
       <div className="overflow-x-auto rounded-xl ring-1 ring-slate-800">
-        <table className="w-full min-w-[960px] border-collapse text-sm">
+        <table className="w-full min-w-[1040px] border-collapse text-sm">
           <thead className="sticky top-0 z-10 bg-slate-900">
             <tr className="border-b border-slate-800">
               <Th sort={sort} setSort={setSort} k="rank" className="w-12">Rk</Th>
@@ -97,6 +98,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
               <Th sort={sort} setSort={setSort} className="w-16">Pos</Th>
               <Th sort={sort} setSort={setSort} className="w-12">Tier</Th>
               <Th sort={sort} setSort={setSort} k="adp" className="w-20">ADP</Th>
+              <Th sort={sort} setSort={setSort} k="espn" className="w-20">ESPN ADP</Th>
               <Th sort={sort} setSort={setSort} k="ppg" className="w-20">27 PPG</Th>
               <Th sort={sort} setSort={setSort} className="w-16">27 Pts</Th>
               <Th sort={sort} setSort={setSort} k="vorp" className="w-16">VORP</Th>
@@ -112,7 +114,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
               return (
                 <Fragment key={p.id}>
                   {tierBreak && (
-                    <tr><td colSpan={12} className="bg-slate-900/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Tier {p.cur.tier}</td></tr>
+                    <tr><td colSpan={13} className="bg-slate-900/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Tier {p.cur.tier}</td></tr>
                   )}
                   <tr
                     onClick={() => setOpen(open === p.id ? null : p.id)}
@@ -153,6 +155,10 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
                     <td className="px-2 py-2 tabular-nums text-slate-300">
                       {p.cur.adp}<span className="ml-1 text-[10px] text-slate-500">{roundPick(p.cur.adp, cfg.teams)}</span>
                     </td>
+                    <td className="px-2 py-2 tabular-nums text-slate-300" title="ESPN average draft position · % of ESPN leagues rostered">
+                      {p.espnAdp != null ? fmt(p.espnAdp) : <span className="text-slate-600">—</span>}
+                      {p.espnOwned != null && <div className="text-[10px] text-slate-500">{p.espnOwned.toFixed(0)}% rost</div>}
+                    </td>
                     <td className="px-2 py-2 font-semibold tabular-nums text-white">{fmt(p.cur.ppg)}</td>
                     <td className="px-2 py-2 tabular-nums text-slate-400">{fmt(p.cur.points, 0)}</td>
                     <td className={`px-2 py-2 tabular-nums font-medium ${p.cur.vorp >= 0 ? "text-emerald-300" : "text-slate-500"}`}>{fmt(p.cur.vorp, 0)}</td>
@@ -162,7 +168,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
                   </tr>
                   {open === p.id && (
                     <tr className="border-b border-slate-800 bg-slate-900/70">
-                      <td colSpan={12} className="px-4 py-3">
+                      <td colSpan={13} className="px-4 py-3">
                         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                           <div>
                             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
@@ -176,7 +182,9 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
                           </div>
                           <div className="text-xs text-slate-400 md:text-right">
                             {!p.rookie && <div>2025: {p.g25} G · 2026: {p.g26} G</div>}
-                            {p.marketRank != null && <div>Market rank (Sleeper): {p.marketRank}</div>}
+                            {p.espnAdp != null && <div>ESPN ADP: {fmt(p.espnAdp)}{p.espnOwned != null ? ` · ${p.espnOwned.toFixed(1)}% rostered` : ""}</div>}
+                            {p.cur.espnRosPpg != null && <div>ESPN rest-of-2026 proj: {fmt(p.cur.espnRosPpg)} PPG</div>}
+                            {p.marketRank != null && <div>Market rank: {p.marketRank}</div>}
                             {p.rookie && <div>Draft capital tier {p.draftTier}</div>}
                           </div>
                         </div>

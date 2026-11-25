@@ -35,6 +35,10 @@ export interface RawPlayer {
   proj: StatLine;
   marketRank: number | null;
   adpOverride: number | null;
+  /** ESPN average draft position (PPR), roster %, and per-game rest-of-season projection */
+  espnAdp: number | null;
+  espnOwned: number | null;
+  espnRos: StatLine | null;
   // outputs under the default league settings
   rank: number;
   posRank: number;
@@ -64,6 +68,8 @@ export interface BoardMeta {
   replacement: Replacement;
   poolSize: number;
   configHash: string;
+  /** which market feeds the ADP blend: ESPN ADP, or Sleeper search rank as fallback */
+  marketSource: "espn" | "sleeper";
 }
 
 export interface BoardData {
@@ -132,5 +138,7 @@ export interface RankedPlayer extends RawPlayer {
     vorp: number;
     /** default-settings rank minus active-settings rank (positive = higher under active settings) */
     settingsDelta: number;
+    /** ESPN rest-of-season projection scored with the active settings */
+    espnRosPpg: number | null;
   };
 }

@@ -85,6 +85,46 @@ CREATE TABLE IF NOT EXISTS rookies (
     notes              TEXT
 );
 
+-- ESPN public fantasy data (lm-api-reads.fantasy.espn.com, no key). Latest pull per player.
+CREATE TABLE IF NOT EXISTS espn_players (
+    espn_id        TEXT PRIMARY KEY,
+    player_id      TEXT,                     -- Sleeper id when mapped
+    name           TEXT NOT NULL,
+    position       TEXT NOT NULL,
+    adp            REAL,                     -- ESPN average draft position (PPR)
+    pct_owned      REAL,
+    pct_started    REAL,
+    auction_value  REAL,
+    injury_status  TEXT,
+    fetched_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_espn_player ON espn_players(player_id);
+
+-- ESPN weekly projections (statSourceId=1) as stat components, all weeks of the season.
+CREATE TABLE IF NOT EXISTS espn_weekly_proj (
+    season    INTEGER NOT NULL,
+    week      INTEGER NOT NULL,
+    espn_id   TEXT NOT NULL,
+    player_id TEXT,
+    pass_att REAL, pass_cmp REAL, pass_yds REAL, pass_td REAL, pass_int REAL, pass_2pt REAL,
+    rush_att REAL, rush_yds REAL, rush_td REAL, rush_2pt REAL,
+    targets  REAL, rec REAL, rec_yds REAL, rec_td REAL, rec_2pt REAL,
+    fum_lost REAL,
+    espn_points REAL,
+    PRIMARY KEY (season, week, espn_id)
+);
+
+-- ESPN ADP / roster% history, one row per player per pull date.
+CREATE TABLE IF NOT EXISTS espn_market_history (
+    fetch_date TEXT NOT NULL,
+    espn_id    TEXT NOT NULL,
+    player_id  TEXT,
+    adp        REAL,
+    pct_owned  REAL,
+    pct_started REAL,
+    PRIMARY KEY (fetch_date, espn_id)
+);
+
 CREATE TABLE IF NOT EXISTS ingest_runs (
     run_id        INTEGER PRIMARY KEY AUTOINCREMENT,
     run_at        TEXT NOT NULL,

@@ -134,6 +134,32 @@ def shrink(player_num, player_den, league_rate, k):
 
 
 # =========================================================================== projection
+def load_espn(con, cfg, season: int, through_week: int) -> tuple[dict, dict]:
+    """ESPN inputs keyed by Sleeper id.
+
+    Returns (rest_of_season, market):
+      rest_of_season[pid] = {"pg": per-game components over the next N weeks ESPN projects the player
+                             to play, "weeks": N}
+      market[pid]         = {"adp": ESPN ADP, "owned": roster %, "started": start %}
+    """
+    pcfg = cfg["projection"]
+    look = int(pcfg.get("espn_lookahead_weeks", 6))
+    ros: dict = {}
+    wk = pd.read_sql_query(
+        "SELECT * FROM espn_weekly_proj WHERE season = ? AND week > ? AND week <= ? AND player_id IS NOT NULL "
+        "AND espn_points > 0", con, params=(season, through_week, min(through_week + look, 18)))
+    if len(wk):
+        g = wk.groupby("player_id")
+        means = g[list(STAT_COMPONENTS)].mean()
+        n = g.size()
+        for pid, row in means.iterrows():
+            ros[pid] = {"pg": {c: float(row[c]) for c in STAT_COMPONENTS}, "weeks": int(n[pid])}
+    mk = pd.read_sql_query("SELECT player_id, adp, pct_owned, pct_started FROM espn_players "
+                           "WHERE player_id IS NOT NULL", con).drop_duplicates("player_id")
+    market = {r.player_id: {"adp": r.adp, "owned": r.pct_owned, "started": r.pct_started} for r in mk.itertuples()}
+    return ros, market
+
+
 def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.DataFrame:
     pcfg = cfg["projection"]
     ws = pd.read_sql_query(
@@ -176,6 +202,8 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
     players = pd.read_sql_query("SELECT * FROM players WHERE is_rookie_2027 = 0", con).set_index("player_id")
     pids = players.index.intersection(a26.index.union(a25.index))
     pw = pcfg["prior_season_weight"]
+    espn_ros, espn_mkt = load_espn(con, cfg, season, through_week)
+    espn_w = float(pcfg.get("espn_projection_weight", 0.0))
 
     # League-average efficiency by position (both seasons, volume weighted)
     lg = ws.groupby("position")[list(STAT_COMPONENTS)].sum()
@@ -240,7 +268,7 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
         g_mult, e_mult, inj_flag = injury_adjustment(pos, p["injury_status"], p["injury_body_part"], p["injury_notes"])
         if inj_flag:
             flags.append("injury_recovery"); why.append(inj_flag)
-        vm = vol_mult * m_age
+        vm = vol_mult  # age/career multiplier is applied after the ESPN blend
 
         tg, ca, at = pg["targets"] * vm, pg["rush_att"] * vm, pg["pass_att"] * vm
         comp = {
@@ -250,6 +278,13 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
             "pass_int": at * intr, "pass_2pt": pg["pass_2pt"] * vm, "rush_2pt": pg["rush_2pt"] * vm,
             "rec_2pt": pg["rec_2pt"] * vm, "fum_lost": pg["fum_lost"] * vm,
         }
+
+        # (a cont.) Blend in ESPN's rest-of-season weekly projections (current role / depth chart view)
+        er = espn_ros.get(pid)
+        if er and er["weeks"] >= 2 and espn_w > 0:
+            comp = {c: (1 - espn_w) * comp[c] + espn_w * er["pg"][c] for c in comp}
+            why.append(f"ESPN rest-of-season projection blended at {espn_w:.0%} ({er['weeks']} wks)")
+        comp = {c: v * m_age for c, v in comp.items()}
 
         # Games: availability history, injury, backup-QB role, retirement risk
         tg26 = float(team_games.get(r26["last_team"], g26)) if r26 is not None else 0.0
@@ -281,6 +316,9 @@ def build_veteran_projections(con, cfg, season: int, through_week: int) -> pd.Da
             "proj": {k: round(float(v), 4) for k, v in comp.items()},
             "search_rank": None if pd.isna(p["search_rank"]) else int(p["search_rank"]),
             "adp_override": None, "draft_capital_tier": None, "flags": flags, "notes": why,
+            "espn_adp": (espn_mkt.get(pid) or {}).get("adp"),
+            "espn_owned": (espn_mkt.get(pid) or {}).get("owned"),
+            "espn_ros": {k: round(v, 4) for k, v in er["pg"].items()} if er else None,
         })
     return pd.DataFrame(rows)
 
@@ -308,6 +346,7 @@ def build_rookie_projections(con) -> pd.DataFrame:
             "stats_2026": {c: 0.0 for c in STAT_COMPONENTS},
             "proj_games": ROOKIE_GAMES[pos][tier] * (0.97 if not r["landing_team"] else 1.0),
             "proj": {k: round(v, 4) for k, v in comp.items()}, "search_rank": None,
+            "espn_adp": None, "espn_owned": None, "espn_ros": None,
             "adp_override": None if pd.isna(r["adp_override"]) else float(r["adp_override"]),
             "draft_capital_tier": tier, "flags": ["rookie"], "notes": notes,
         })
@@ -360,10 +399,17 @@ def score_board(df: pd.DataFrame, cfg: dict) -> tuple[pd.DataFrame, dict]:
     df["overall_rank"] = np.arange(1, len(df) + 1)
     df["pos_rank"] = df.groupby("position").cumcount() + 1
 
-    # ADP: model rank blended with market (Sleeper search_rank) where available; manual overrides win.
+    # ADP: model rank blended with the market where available; manual overrides win.
+    # Market = ESPN ADP when the ESPN pull succeeded, otherwise Sleeper's search_rank.
     w = cfg["projection"]["market_adp_weight"]
-    sr = pd.to_numeric(df["search_rank"], errors="coerce")
-    mkt = sr.where(sr < 1e6)
+    espn_adp = pd.to_numeric(df["espn_adp"], errors="coerce")
+    if cfg["projection"].get("market_source", "espn") == "espn" and espn_adp.notna().sum() >= 100:
+        mkt = espn_adp
+        rl["market_source"] = "espn"
+    else:
+        sr = pd.to_numeric(df["search_rank"], errors="coerce")
+        mkt = sr.where(sr < 1e6)
+        rl["market_source"] = "sleeper"
     df["market_rank"] = mkt.rank(method="first")
     blend = np.where(df["market_rank"].notna(), (1 - w) * df["overall_rank"] + w * df["market_rank"], df["overall_rank"])
     df["adp"] = np.where(df["adp_override"].notna(), df["adp_override"], blend)
@@ -449,6 +495,9 @@ def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int
             "touchShare": r.touch_share_2026, "s26": r.stats_2026,
             "projGames": r.proj_games, "proj": r.proj,
             "marketRank": None if pd.isna(r.market_rank) else int(r.market_rank),
+            "espnAdp": None if pd.isna(r.espn_adp) else round(float(r.espn_adp), 1),
+            "espnOwned": None if pd.isna(r.espn_owned) else round(float(r.espn_owned), 1),
+            "espnRos": r.espn_ros if isinstance(r.espn_ros, dict) else None,
             "adpOverride": r.adp_override,
             # default-settings outputs (browser recomputes these for toggled settings)
             "rank": int(r.overall_rank), "posRank": int(r.pos_rank), "adp": float(r.adp), "tier": int(r.tier),
@@ -474,7 +523,8 @@ def export(con, board: pd.DataFrame, rl: dict, cfg: dict, season: int, week: int
         "generatedAt": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "sourceSeason": season, "throughWeek": week, "previousWeek": prev_week,
         "targetSeason": cfg["target_season"], "lastIngest": last_run[0] if last_run else None,
-        "ingestNotes": last_run[1] if last_run else None, "replacement": rl,
+        "ingestNotes": last_run[1] if last_run else None, "replacement": {"points": rl["points"], "starters": rl["starters"]},
+        "marketSource": rl.get("market_source", "sleeper"),
         "poolSize": len(players), "configHash": config_hash(cfg),
     }
     def write(name: str, obj) -> None:
