@@ -96,4 +96,6 @@ Your local edits always win.
 
 ## Deploying to Vercel
 
-Import the repo, set **Root Directory = `web`**, and use the default Next.js build settings. The page is fully static: data is baked in at build time.
+Import the repo and leave **Root Directory empty** (the repo root). Vercel reads the root `vercel.json`, which declares one
+Services entry, `web` (the Next.js app in `web/`), serving every path. Setting Root Directory to `web` makes Vercel look for
+`web/vercel.json` instead and fail with "no services are declared". The page is fully static: data is baked in at build time.
