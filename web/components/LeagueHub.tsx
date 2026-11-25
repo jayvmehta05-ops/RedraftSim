@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } from "@/lib/refresh";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
+import LuckMeter from "./LuckMeter";
 import MyTeam from "./MyTeam";
 import PowerRankings from "./PowerRankings";
 import TradeAssistant from "./TradeAssistant";
 import Waivers from "./Waivers";
 
-type Section = "team" | "trades" | "waivers" | "power";
+type Section = "team" | "trades" | "waivers" | "power" | "luck";
 
 /** Shown when ESPN needs fresh login cookies for a private league; retries the refresh on submit. */
 function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember: boolean) => void; busy: boolean; error: string | null }) {
@@ -86,10 +87,11 @@ export default function LeagueHub(props: {
   // Waivers and power rankings need rosters (and waivers needs your team); the Trades view walks users through that
   const ready = !!league?.rosters?.some((r) => r.playerIds.length || (r.manualIds ?? []).length);
   const sections: { id: Section; label: string; needsMe: boolean }[] = [
-    { id: "team", label: "My team", needsMe: true },
+    { id: "team", label: "Rosters", needsMe: true },
     { id: "trades", label: "Trades", needsMe: true },
     { id: "waivers", label: "Waivers", needsMe: true },
     { id: "power", label: "Power rankings", needsMe: false },
+    { id: "luck", label: "Luck meter", needsMe: false },
   ];
   const current = sections.find((s) => s.id === section)!;
   const blocked = section !== "trades" && (!ready || (current.needsMe && !league?.managers.some((m) => m.id === myManager)));
@@ -117,10 +119,14 @@ export default function LeagueHub(props: {
         <TradeAssistant {...props} onRefresh={() => refresh()} refreshing={refreshing} refreshError={needsLogin ? null : refreshError} />
       )}
       {section === "team" && !blocked && league && myManager && (
-        <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} onGo={setSection} />
+        <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} leaguemates={props.leaguemates}
+          weeksLeft={props.weeksLeft} onGo={setSection} onOpenEditor={props.onOpenEditor} />
       )}
       {section === "waivers" && !blocked && league && myManager && (
         <Waivers board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} />
+      )}
+      {section === "luck" && !blocked && league && (
+        <LuckMeter league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />
       )}
       {section === "power" && !blocked && league && (
         <PowerRankings board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={props.weeksLeft} />

@@ -14,7 +14,7 @@ import type { LeaguemateProfile } from "./leaguemates";
 import type { LeagueConfig, Pos, RankedPlayer } from "./types";
 import { POSITIONS } from "./types";
 
-export type Horizon = "ros" | "next" | "both";
+export type Horizon = "ros" | "next" | "both" | "week";
 const BENCH_WEIGHT = 0.15;
 const BENCH_DEPTH = 4;
 
@@ -22,6 +22,12 @@ export function playerValue(p: RankedPlayer, horizon: Horizon, weeksLeft: number
   const next = Math.max(0, p.cur.points);
   if (horizon === "next") return next;
   const rosPpg = p.cur.espnRosPpg ?? (p.g26 > 0 ? 0.6 * p.cur.ppg26 + 0.4 * p.cur.ppg : 0);
+  if (horizon === "week") {
+    // One week (1-week / loan trades): only this week's health matters
+    const status = p.injury ?? "";
+    const health = ["IR", "PUP", "Out", "Suspended", "NA"].includes(status) ? 0 : status === "Doubtful" ? 0.25 : status === "Questionable" ? 0.85 : 1;
+    return Math.max(0, rosPpg) * health;
+  }
   let avail = Math.min(1, p.projGames / 17 + 0.08);
   if (p.injury === "IR" || p.injury === "PUP") avail *= 0.35;
   else if (p.injury === "Out") avail *= 0.8;
@@ -193,6 +199,63 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
       return (counts.get(k) ?? 0) <= 2;
     })
     .slice(0, opts.total);
+}
+
+/** Distinct packages, best first: no two results send the same players. */
+function distinctBy(ts: TradeEval[], key: (t: TradeEval) => string, limit: number): TradeEval[] {
+  const seen = new Set<string>();
+  const out: TradeEval[] = [];
+  for (const t of ts) {
+    const k = key(t);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(t);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+const ids = (ps: RankedPlayer[]) => ps.map((p) => p.id).sort().join(",");
+
+/**
+ * "I want this player": offers to `partner` that land `target`, best first. Tries giving one or two of your
+ * top players for the target alone or the target plus one of theirs. Ranked by the chance they say yes and how
+ * little it costs your lineup. If nothing is realistic, the closest long shots come back so you see the gap.
+ */
+export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Partner, cfg: LeagueConfig, limit = 4): TradeEval[] {
+  const top = (r: Valued[], n: number) => [...r].sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.p);
+  const myCands = top(mine, 10);
+  const extras = top(partner.roster.filter((x) => x.p.id !== target.id), 6);
+  const gets: RankedPlayer[][] = [[target], ...extras.map((p) => [target, p])];
+  const gives = [...combos(myCands, 1), ...combos(myCands, 2)];
+  const before = { mine: lineupValue(mine, cfg).total, theirs: lineupValue(partner.roster, cfg).total };
+  const all: TradeEval[] = [];
+  for (const get of gets) for (const give of gives) {
+    // Don't ask for an extra player of theirs unless you're sending two back
+    if (get.length > give.length) continue;
+    all.push(evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before));
+  }
+  const score = (t: TradeEval) => t.accept + 6 * (t.myGain / Math.max(before.mine, 1));
+  const realistic = all.filter((t) => t.accept >= 0.4).sort((a, b) => score(b) - score(a));
+  if (realistic.length) return distinctBy(realistic, (t) => ids(t.give), limit);
+  return distinctBy([...all].sort((a, b) => b.accept - a.accept), (t) => ids(t.give), Math.min(2, limit));
+}
+
+/** "Shop my player": the best realistic return for `player` from every other team. */
+export function shopPlayer(player: RankedPlayer, mine: Valued[], partners: Partner[], cfg: LeagueConfig, limit = 4): TradeEval[] {
+  const myBefore = lineupValue(mine, cfg).total;
+  const out: TradeEval[] = [];
+  for (const partner of partners) {
+    const theirs = [...partner.roster].sort((a, b) => b.v - a.v).slice(0, 8).map((x) => x.p);
+    const before = { mine: myBefore, theirs: lineupValue(partner.roster, cfg).total };
+    let best: TradeEval | null = null;
+    for (const get of [...combos(theirs, 1), ...combos(theirs, 2)]) {
+      const t = evaluateTrade(mine, partner.roster, [player], get, cfg, partner.id, partner.lean, before);
+      if (t.myGain <= 0 || t.accept < 0.4) continue;
+      if (!best || t.myGain * t.accept > best.myGain * best.accept) best = t;
+    }
+    if (best) out.push(best);
+  }
+  return out.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept).slice(0, limit);
 }
 
 /** The best lineup laid out slot by slot (QB, RB, RB, …, FLEX, SUPERFLEX); empty slots come back as null. */

@@ -190,6 +190,15 @@ export interface ImportedLeague {
     record?: { wins: number; losses: number; ties: number; pointsFor: number };
     /** FAAB budget remaining (Sleeper) */
     faabLeft?: number;
+    /** Points scored in each completed regular-season week (index 0 = week 1), and that week's opponent's
+     *  managerId (null for a bye / median week). Used by the luck meter. */
+    weekly?: number[];
+    opponents?: (string | null)[];
   }[];
   fetchedAt?: string;
+  /** League rules the user sets by hand (kept across refreshes) */
+  rules?: {
+    /** the league allows 1-week (loan) trades: players swap for one week, then go back */
+    weekTrades?: boolean;
+  };
 }

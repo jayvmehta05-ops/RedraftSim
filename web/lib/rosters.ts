@@ -25,6 +25,7 @@ export function unmatchedCount(r: Roster, byId: Map<string, RankedPlayer>, byEsp
 
 /** Carry hand edits (added / removed players) over when a league is re-imported. */
 export function keepRosterEdits(prev: ImportedLeague | null, next: ImportedLeague): ImportedLeague {
+  if (prev?.rules) next = { ...next, rules: prev.rules }; // hand-set league rules survive a re-import
   if (!prev?.rosters || !next.rosters) return next;
   const edits = new Map(prev.rosters.map((r) => [r.managerId, r]));
   return {

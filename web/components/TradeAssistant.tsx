@@ -30,7 +30,7 @@ interface Props {
 }
 
 
-function acceptLabel(a: number) {
+export function acceptLabel(a: number) {
   if (a >= 0.6) return { text: "Likely yes", cls: "bg-emerald-500/20 text-emerald-300" };
   if (a >= 0.42) return { text: "Maybe", cls: "bg-amber-500/20 text-amber-300" };
   return { text: "Long shot", cls: "bg-rose-500/15 text-rose-300" };
@@ -50,7 +50,7 @@ function Players({ ps }: { ps: RankedPlayer[] }) {
   );
 }
 
-function TradeCard({ t, partnerName, onAnalyze }: { t: TradeEval; partnerName: string; onAnalyze: () => void }) {
+export function TradeCard({ t, partnerName, onAnalyze, note }: { t: TradeEval; partnerName: string; onAnalyze?: () => void; note?: string }) {
   const a = acceptLabel(t.accept);
   const pct = (x: number, base: number) => `${x >= 0 ? "+" : ""}${((x / Math.max(base, 1)) * 100).toFixed(1)}%`;
   return (
@@ -70,11 +70,12 @@ function TradeCard({ t, partnerName, onAnalyze }: { t: TradeEval; partnerName: s
         </div>
       </div>
       <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs">
-        <span className="text-slate-400">Your lineup <b className="text-emerald-300">+{fmt(t.myGain, 0)} pts</b> ({pct(t.myGain, t.myBefore)})</span>
+        <span className="text-slate-400">Your lineup <b className={t.myGain >= 0 ? "text-emerald-300" : "text-rose-300"}>{t.myGain >= 0 ? "+" : ""}{fmt(t.myGain, 0)} pts</b> ({pct(t.myGain, t.myBefore)})</span>
         <span className="text-slate-400">Theirs <b className={t.theirGain >= 0 ? "text-emerald-300" : "text-rose-300"}>{t.theirGain >= 0 ? "+" : ""}{fmt(t.theirGain, 0)} pts</b></span>
       </div>
       {t.reasons.length > 0 && <ul className="mt-2 text-[11px] text-slate-500">{t.reasons.slice(0, 3).map((r) => <li key={r}>• {r}</li>)}</ul>}
-      <button onClick={onAnalyze} className="mt-3 text-xs font-semibold text-emerald-400 hover:underline">Tweak in the analyzer →</button>
+      {note && <p className="mt-2 text-[11px] text-amber-300/90">{note}</p>}
+      {onAnalyze && <button onClick={onAnalyze} className="mt-3 text-xs font-semibold text-emerald-400 hover:underline">Tweak in the analyzer →</button>}
     </div>
   );
 }

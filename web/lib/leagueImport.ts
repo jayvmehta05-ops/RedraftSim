@@ -81,6 +81,40 @@ const SLEEPER_UNMODELED: Record<string, string> = {
   pass_td_40p: "40+ yd passing TD bonus", rush_td_40p: "40+ yd rushing TD bonus", rec_td_40p: "40+ yd receiving TD bonus",
 };
 
+/** Turn per-week (team, points, matchup) rows into each team's weekly points and opponents. */
+function weeklyFrom(weeks: { team: string; points: number; matchup: string | null }[][]) {
+  const out = new Map<string, { weekly: number[]; opponents: (string | null)[] }>();
+  weeks.forEach((rows, w) => {
+    for (const r of rows) {
+      const t = out.get(r.team) ?? { weekly: [], opponents: [] };
+      t.weekly[w] = Math.round(r.points * 100) / 100;
+      t.opponents[w] = r.matchup == null ? null : rows.find((o) => o.matchup === r.matchup && o.team !== r.team)?.team ?? null;
+      out.set(r.team, t);
+    }
+  });
+  return out;
+}
+
+/** Completed regular-season weeks from Sleeper's matchups endpoint (one request per week). */
+async function sleeperWeekly(lg: SleeperLeague, ownerOf: Map<number, string>) {
+  const playoffStart = Number(lg.settings?.playoff_week_start) || 15;
+  let last = Number(lg.settings?.last_scored_leg) || 0;
+  if (!last) {
+    const st = await getJson<{ week: number; season: string; season_type: string }>("https://api.sleeper.app/v1/state/nfl").catch(() => null);
+    if (st && st.season === lg.season) last = st.season_type === "regular" ? st.week - 1 : st.season_type === "post" ? 18 : 0;
+  }
+  const n = Math.max(0, Math.min(last, playoffStart - 1, 18));
+  const raw = await Promise.all(Array.from({ length: n }, (_, i) =>
+    getJson<{ roster_id: number; matchup_id: number | null; points: number }[]>(
+      `https://api.sleeper.app/v1/league/${lg.league_id}/matchups/${i + 1}`).catch(() => [])));
+  const weeks = raw.map((rows) => (Array.isArray(rows) ? rows : [])
+    .filter((r) => ownerOf.has(r.roster_id))
+    .map((r) => ({ team: ownerOf.get(r.roster_id)!, points: Number(r.points) || 0, matchup: r.matchup_id == null ? null : String(r.matchup_id) })));
+  // Stop at the first week nobody scored in (not played yet)
+  const played = weeks.findIndex((rows) => !rows.some((r) => r.points > 0));
+  return weeklyFrom(played === -1 ? weeks : weeks.slice(0, played));
+}
+
 async function importSleeper(id: string): Promise<ImportedLeague> {
   const lg = await getJson<SleeperLeague>(`https://api.sleeper.app/v1/league/${encodeURIComponent(id)}`);
   if (!lg || !lg.league_id) throw new ImportError("League not found. Check the league ID.", 404);
@@ -113,10 +147,13 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
     settings?: { wins?: number; losses?: number; ties?: number; fpts?: number; fpts_decimal?: number; waiver_budget_used?: number };
   }[]>(
     `https://api.sleeper.app/v1/league/${lg.league_id}/rosters`).catch(() => []);
+  const weekly = await sleeperWeekly(lg, new Map(sleeperRosters.filter((r) => r.owner_id).map((r) => [r.roster_id, String(r.owner_id)])))
+    .catch(() => new Map<string, { weekly: number[]; opponents: (string | null)[] }>());
   const rosters = sleeperRosters
     .filter((r) => r.owner_id)
     .map((r) => ({
       managerId: String(r.owner_id), playerIds: (r.players ?? []).map(String), idType: "sleeper" as const,
+      ...weekly.get(String(r.owner_id)),
       record: {
         wins: r.settings?.wins ?? 0, losses: r.settings?.losses ?? 0, ties: r.settings?.ties ?? 0,
         pointsFor: (r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100,
@@ -174,6 +211,10 @@ interface EspnLeague {
   }[];
   members?: { id: string; displayName: string }[];
   draftDetail?: { drafted?: boolean; picks?: { overallPickNumber: number; roundId: number; teamId: number; playerId: number }[] };
+  schedule?: {
+    matchupPeriodId: number; playoffTierType?: string; winner?: string;
+    home?: { teamId: number; totalPoints?: number }; away?: { teamId: number; totalPoints?: number };
+  }[];
 }
 
 // ESPN lineup slot ids
@@ -191,7 +232,7 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
   const base = `https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/${season}/segments/0/leagues/${encodeURIComponent(id)}`;
   let lg: EspnLeague;
   try {
-    lg = await getJson<EspnLeague>(`${base}?view=mSettings&view=mTeam&view=mDraftDetail&view=mRoster`, { headers: cookieHeader(auth) });
+    lg = await getJson<EspnLeague>(`${base}?view=mSettings&view=mTeam&view=mDraftDetail&view=mRoster&view=mMatchupScore`, { headers: cookieHeader(auth) });
   } catch (e) {
     if (e instanceof ImportError && e.message === "PRIVATE") {
       throw new ImportError(auth?.espnS2
@@ -253,9 +294,19 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
     });
   }
   const starters = roster.QB + roster.RB + roster.WR + roster.TE + roster.FLEX + roster.SUPERFLEX + roster.K + roster.DST;
+  // Completed regular-season matchups, grouped by matchup period, for the luck meter
+  const done = (lg.schedule ?? []).filter((m) => (m.playoffTierType ?? "NONE") === "NONE" && m.winner && m.winner !== "UNDECIDED");
+  const periods = Array.from(new Set(done.map((m) => m.matchupPeriodId))).sort((a, b) => a - b);
+  const weekly = weeklyFrom(periods.map((p) => done.filter((m) => m.matchupPeriodId === p).flatMap((m, i) => {
+    const key = `${p}-${i}`;
+    const side = (s: { teamId: number; totalPoints?: number } | undefined, paired: boolean) =>
+      s ? [{ team: String(s.teamId), points: s.totalPoints ?? 0, matchup: paired ? key : null }] : [];
+    return [...side(m.home, !!m.away), ...side(m.away, !!m.home)];
+  })));
   return {
     rosters: (lg.teams ?? []).map((t) => ({
       managerId: String(t.id), playerIds: (t.roster?.entries ?? []).map((e) => String(e.playerId)), idType: "espn" as const,
+      ...weekly.get(String(t.id)),
       record: {
         wins: t.record?.overall?.wins ?? 0, losses: t.record?.overall?.losses ?? 0, ties: t.record?.overall?.ties ?? 0,
         pointsFor: t.record?.overall?.pointsFor ?? 0,

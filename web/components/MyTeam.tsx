@@ -2,22 +2,26 @@
 
 import { useMemo, useState } from "react";
 import { powerRankings } from "@/lib/league";
+import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { SOURCE, TARGET } from "@/lib/season";
-import { type Horizon, type Valued, lineupSlots, lineupValue } from "@/lib/trade";
+import { type Horizon, type Partner, type TradeEval as BaseTrade, type Valued, findTradesFor, lineupSlots, lineupValue, shopPlayer } from "@/lib/trade";
 import type { ImportedLeague, LeagueConfig, Pos, RankedPlayer } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
-import { useLeagueTeams } from "./useLeagueTeams";
+import { TradeCard } from "./TradeAssistant";
+import { type LeagueTeam, useLeagueTeams } from "./useLeagueTeams";
 import { HorizonToggle } from "./Waivers";
 import { Flags, PosBadge, fmt, thumb } from "./ui";
 
 const POS_NAME: Record<Pos, string> = { QB: "quarterback", RB: "running back", WR: "receiver", TE: "tight end" };
+type Mode = "trade" | "week" | "shop";
+type TradeEval = BaseTrade & { partnerName?: string };
 
-function PlayerRow({ slot, x, dim }: { slot?: string; x: Valued | null; dim?: boolean }) {
+function PlayerRow({ slot, x, dim, selected, onClick }: { slot?: string; x: Valued | null; dim?: boolean; selected?: boolean; onClick?: () => void }) {
   if (!x) {
     return (
       <div className="flex items-center gap-3 border-b border-slate-800/70 bg-slate-950 px-4 py-2.5 last:border-0">
         <span className="w-12 text-[11px] font-bold text-slate-500">{slot}</span>
-        <span className="text-sm italic text-rose-300">Empty: no eligible player on your roster</span>
+        <span className="text-sm italic text-rose-300">Empty: no eligible player on this roster</span>
       </div>
     );
   }
@@ -26,7 +30,8 @@ function PlayerRow({ slot, x, dim }: { slot?: string; x: Valued | null; dim?: bo
   const ros = p.cur.espnRosPpg ?? (p.g26 > 0 ? p.cur.ppg26 : null);
   const hurt = p.injury && p.injury !== "Active";
   return (
-    <div className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-800/70 px-4 py-2.5 last:border-0 ${dim ? "bg-slate-950/60" : "bg-slate-950"}`}>
+    <button type="button" onClick={onClick} aria-expanded={selected}
+      className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-800/70 px-4 py-2.5 text-left transition last:border-0 hover:bg-slate-900 ${selected ? "bg-slate-900 ring-1 ring-emerald-500/40 ring-inset" : dim ? "bg-slate-950/60" : "bg-slate-950"}`}>
       {slot && <span className="w-12 text-[11px] font-bold text-slate-400">{slot}</span>}
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
         {img ? (
@@ -57,56 +62,147 @@ function PlayerRow({ slot, x, dim }: { slot?: string; x: Valued | null; dim?: bo
         <div className="text-sm tabular-nums text-slate-200">#{p.cur.rank}</div>
         <div className="text-[10px] text-slate-500">{TARGET} rank</div>
       </div>
+    </button>
+  );
+}
+
+/** Actions for a clicked player: trade for them (or a 1-week trade), or shop your own player. */
+function PlayerActions({ player, owner, isMine, weekTrades, weeksLeft, onOpenEditor, ideas }: {
+  player: RankedPlayer; owner: LeagueTeam; isMine: boolean; weekTrades: boolean; weeksLeft: number; onOpenEditor: () => void;
+  ideas: (mode: Mode) => TradeEval[];
+}) {
+  const [mode, setMode] = useState<Mode | null>(null);
+  const results = useMemo(() => (mode ? ideas(mode) : []), [mode, ideas]);
+  const longShot = results.length > 0 && results.every((t) => t.accept < 0.4);
+  const btn = (m: Mode, label: string, sub: string) => (
+    <button onClick={() => setMode(m)}
+      className={`rounded-lg px-3 py-2 text-left text-xs ring-1 transition ${mode === m ? "bg-emerald-500 text-slate-950 ring-emerald-500" : "bg-slate-900 text-slate-200 ring-slate-700 hover:ring-emerald-500/60"}`}>
+      <div className="font-bold">{label}</div>
+      <div className={mode === m ? "text-slate-900/80" : "text-slate-500"}>{sub}</div>
+    </button>
+  );
+  return (
+    <div className="space-y-3 border-b border-slate-800/70 bg-slate-900/70 px-4 py-3">
+      <div className="flex flex-wrap gap-2">
+        {isMine ? (
+          btn("shop", `Shop ${player.name.split(" ").slice(-1)[0]}`, "Best offers from every team")
+        ) : (
+          <>
+            {btn("trade", `Trade for ${player.name.split(" ").slice(-1)[0]}`, `Offers ${owner.name} might take`)}
+            {weekTrades && weeksLeft > 0 && btn("week", "1-week trade", "Borrow him for this week")}
+          </>
+        )}
+        {!isMine && !weekTrades && weeksLeft > 0 && (
+          <button onClick={onOpenEditor} className="self-center text-[11px] text-slate-500 hover:text-slate-300">League allows 1-week trades? Turn it on →</button>
+        )}
+      </div>
+      {mode && (
+        results.length === 0 ? (
+          <p className="text-xs text-slate-400">
+            {mode === "shop" ? `No team has an offer for ${player.name} that clearly helps your lineup right now.` : `No offer found. ${owner.name}'s roster may not fit anything you can send.`}
+          </p>
+        ) : (
+          <>
+            {longShot && <p className="text-xs text-amber-300">Nothing here is likely to be accepted. These are the closest offers, so you can see the gap.</p>}
+            <div className="grid gap-3 md:grid-cols-2">
+              {results.map((t, i) => (
+                <TradeCard key={i} t={t} partnerName={mode === "shop" ? (t.partnerName ?? "Team") : owner.name}
+                  note={mode === "week" ? "1-week trade: values are this week's projected points, and everyone goes back after the week." : undefined} />
+              ))}
+            </div>
+          </>
+        )
+      )}
     </div>
   );
 }
 
-/** "My team": your roster laid out as your best lineup and bench, with how each position group stacks up. */
-export default function MyTeam({ board, cfg, league, myManager, weeksLeft, onGo }: {
-  board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string; weeksLeft: number;
-  onGo: (section: "trades" | "waivers" | "power") => void;
+/** Rosters: any team's best lineup and bench. Click a player to trade for them, or to shop your own. */
+export default function MyTeam({ board, cfg, league, myManager, leaguemates, weeksLeft, onGo, onOpenEditor }: {
+  board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string; leaguemates: LeaguemateProfile[];
+  weeksLeft: number; onGo: (section: "trades" | "waivers" | "power") => void; onOpenEditor: () => void;
 }) {
   const [horizon, setHorizon] = useState<Horizon>(weeksLeft > 2 ? "ros" : "next");
+  const [teamId, setTeamId] = useState(myManager);
+  const [selected, setSelected] = useState<string | null>(null);
   const { teams } = useLeagueTeams(board, league, horizon, weeksLeft);
+  const { teams: weekTeams } = useLeagueTeams(board, league, "week", weeksLeft);
+  const leans = useMemo(() => new Map(leaguemates.map((l) => [l.managerId, l])), [leaguemates]);
   const me = teams.find((t) => t.id === myManager);
+  const viewing = teams.find((t) => t.id === teamId) ?? me;
+  const isMine = viewing?.id === myManager;
   const power = useMemo(() => powerRankings(teams, cfg), [teams, cfg]);
   const view = useMemo(() => {
-    if (!me) return null;
-    const slots = lineupSlots(me.roster, cfg);
-    const { bench, total } = lineupValue(me.roster, cfg);
-    return { slots, bench, total };
-  }, [me, cfg]);
-  if (!me || !view) return null;
+    if (!viewing) return null;
+    const { bench, total } = lineupValue(viewing.roster, cfg);
+    return { slots: lineupSlots(viewing.roster, cfg), bench, total };
+  }, [viewing, cfg]);
 
-  const row = power.find((r) => r.id === me.id);
+  // Trade ideas for the clicked player, computed on demand
+  const ideas = useMemo(() => {
+    return (mode: Mode, player: RankedPlayer): TradeEval[] => {
+      const pool = mode === "week" ? weekTeams : teams;
+      const mine = pool.find((t) => t.id === myManager);
+      if (!mine || !viewing) return [];
+      const asPartner = (t: LeagueTeam): Partner => ({ id: t.id, name: t.name, roster: t.roster, lean: leans.get(t.id) });
+      if (mode === "shop") {
+        const names = new Map(pool.map((t) => [t.id, t.name]));
+        return shopPlayer(player, mine.roster, pool.filter((t) => t.id !== myManager && t.roster.length).map(asPartner), cfg)
+          .map((t) => ({ ...t, partnerName: names.get(t.partnerId) }));
+      }
+      const owner = pool.find((t) => t.id === viewing.id);
+      return owner ? findTradesFor(player, mine.roster, asPartner(owner), cfg) : [];
+    };
+  }, [teams, weekTeams, myManager, viewing, leans, cfg]);
+
+  if (!me || !viewing || !view) return null;
+
+  const row = power.find((r) => r.id === viewing.id);
   const horizonLabel = horizon === "ros" ? `rest of ${SOURCE}` : horizon === "next" ? `${TARGET} season` : `${SOURCE} + ${TARGET}`;
   const sorted = row ? POSITIONS.map((p) => [p, row.strengths[p]] as const).sort((a, b) => a[1] - b[1]) : [];
   const weakest = sorted[0];
 
-  // A few plain-English takeaways
+  // A few plain-English takeaways (your team only)
   const notes: { text: string; go?: "trades" | "waivers" }[] = [];
-  if (weakest && weakest[1] < -0.05) {
-    notes.push({ text: `Your ${POS_NAME[weakest[0]]}s are ${Math.round(-weakest[1] * 100)}% below the league-average starter, your biggest weakness.`, go: "trades" });
+  if (isMine) {
+    if (weakest && weakest[1] < -0.05) {
+      notes.push({ text: `Your ${POS_NAME[weakest[0]]}s are ${Math.round(-weakest[1] * 100)}% below the league-average starter, your biggest weakness.`, go: "trades" });
+    }
+    const hurtStarters = view.slots.filter((s) => s.x && ["IR", "Out", "PUP", "Doubtful"].includes(s.x.p.injury ?? ""));
+    if (hurtStarters.length) {
+      notes.push({ text: `${hurtStarters.map((s) => s.x!.p.name).join(", ")} ${hurtStarters.length === 1 ? "is" : "are"} injured but still in your best lineup on value. Check who's healthy this week.`, go: "waivers" });
+    }
+    const emptySlots = view.slots.filter((s) => !s.x).length;
+    if (emptySlots) notes.push({ text: `${emptySlots} starting spot${emptySlots === 1 ? " has" : "s have"} no eligible player.`, go: "waivers" });
+    const stash = [...view.bench].sort((a, b) => b.p.cur.points - a.p.cur.points)[0];
+    const worstSame = stash && view.slots.filter((s) => s.x && s.x.p.pos === stash.p.pos).map((s) => s.x!).sort((a, b) => a.p.cur.points - b.p.cur.points)[0];
+    if (stash && worstSame && stash.p.cur.points > worstSame.p.cur.points) {
+      notes.push({ text: `${stash.p.name} sits on your bench but projects better than ${worstSame.p.name} for ${TARGET}. Worth holding in keeper leagues.` });
+    }
   }
-  const hurtStarters = view.slots.filter((s) => s.x && ["IR", "Out", "PUP", "Doubtful"].includes(s.x.p.injury ?? ""));
-  if (hurtStarters.length) {
-    notes.push({ text: `${hurtStarters.map((s) => s.x!.p.name).join(", ")} ${hurtStarters.length === 1 ? "is" : "are"} injured but still in your best lineup on value. Check who's healthy this week.`, go: "waivers" });
-  }
-  const emptySlots = view.slots.filter((s) => !s.x).length;
-  if (emptySlots) notes.push({ text: `${emptySlots} starting spot${emptySlots === 1 ? " has" : "s have"} no eligible player.`, go: "waivers" });
-  const stash = [...view.bench].sort((a, b) => b.p.cur.points - a.p.cur.points)[0];
-  const worstStarter = view.slots.filter((s) => s.x).map((s) => s.x!).sort((a, b) => a.p.cur.points - b.p.cur.points)[0];
-  if (stash && worstStarter && stash.p.cur.points > worstStarter.p.cur.points) {
-    notes.push({ text: `${stash.p.name} sits on your bench but projects better than ${worstStarter.p.name} for ${TARGET}. Worth holding in keeper leagues.` });
-  }
+
+  const rowFor = (x: Valued | null, slot: string, dim?: boolean, key?: string) => (
+    <div key={key ?? x?.p.id ?? slot}>
+      <PlayerRow slot={slot} x={x} dim={dim} selected={!!x && selected === x.p.id}
+        onClick={x ? () => setSelected(selected === x.p.id ? null : x.p.id) : undefined} />
+      {x && selected === x.p.id && (
+        <PlayerActions key={`${viewing.id}-${x.p.id}`} player={x.p} owner={viewing} isMine={isMine}
+          weekTrades={!!league.rules?.weekTrades} weeksLeft={weeksLeft} onOpenEditor={onOpenEditor}
+          ideas={(m) => ideas(m, x.p)} />
+      )}
+    </div>
+  );
 
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 ring-1 ring-slate-800">
         <div className="min-w-0">
-          <div className="truncate text-sm font-semibold text-white">{me.name}</div>
-          <div className="text-[11px] text-slate-500">
-            {me.record ? `${me.record.wins}-${me.record.losses}${me.record.ties ? `-${me.record.ties}` : ""} · ${fmt(me.record.pointsFor, 0)} PF · ` : ""}
+          <select value={viewing.id} onChange={(e) => { setTeamId(e.target.value); setSelected(null); }} aria-label="Team to view"
+            className="max-w-[16rem] truncate rounded-md bg-slate-800 py-1 pr-7 pl-2 text-sm font-semibold text-white ring-1 ring-slate-700">
+            {teams.filter((t) => t.roster.length).map((t) => <option key={t.id} value={t.id}>{t.id === myManager ? `${t.name} (you)` : t.name}</option>)}
+          </select>
+          <div className="mt-1 text-[11px] text-slate-500">
+            {viewing.record ? `${viewing.record.wins}-${viewing.record.losses}${viewing.record.ties ? `-${viewing.record.ties}` : ""} · ${fmt(viewing.record.pointsFor, 0)} PF · ` : ""}
             {row ? <>#{row.rank} of {power.length} by projected lineup ({horizonLabel})</> : null}
           </div>
         </div>
@@ -155,10 +251,14 @@ export default function MyTeam({ board, cfg, league, myManager, weeksLeft, onGo 
         </ul>
       )}
 
+      <p className="text-xs text-slate-400">
+        {isMine ? "Click one of your players to see what he'd bring back in a trade." : `Click any of ${viewing.name}'s players to see offers they might accept.`}
+      </p>
+
       <div>
         <h3 className="mb-2 text-xs font-bold tracking-wide text-slate-400 uppercase">Best lineup</h3>
         <div className="overflow-hidden rounded-xl ring-1 ring-slate-800">
-          {view.slots.map((s, i) => <PlayerRow key={`${s.slot}-${i}`} slot={s.slot} x={s.x} />)}
+          {view.slots.map((s, i) => rowFor(s.x, s.slot, false, `${s.slot}-${i}`))}
         </div>
       </div>
 
@@ -166,7 +266,7 @@ export default function MyTeam({ board, cfg, league, myManager, weeksLeft, onGo 
         <div>
           <h3 className="mb-2 text-xs font-bold tracking-wide text-slate-400 uppercase">Bench</h3>
           <div className="overflow-hidden rounded-xl ring-1 ring-slate-800">
-            {view.bench.map((x) => <PlayerRow key={x.p.id} slot="BN" x={x} dim />)}
+            {view.bench.map((x) => rowFor(x, "BN", true))}
           </div>
         </div>
       )}
@@ -174,7 +274,7 @@ export default function MyTeam({ board, cfg, league, myManager, weeksLeft, onGo 
       <p className="text-[11px] text-slate-500">
         Best lineup = the starters with the most projected points for the {horizonLabel}, under your league&apos;s roster slots.
         It isn&apos;t a weekly start/sit call (matchups and byes aren&apos;t modeled).
-        {me.unmatched > 0 && ` ${me.unmatched} rostered player${me.unmatched === 1 ? " isn't" : "s aren't"} shown (kickers, defenses or players outside our board).`}
+        {viewing.unmatched > 0 && ` ${viewing.unmatched} rostered player${viewing.unmatched === 1 ? " isn't" : "s aren't"} shown (kickers, defenses or players outside our board).`}
         {" "}Wrong players? Refresh rosters in Trades or edit them in the league editor.
       </p>
     </section>

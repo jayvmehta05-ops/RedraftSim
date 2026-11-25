@@ -221,6 +221,17 @@ export default function LeagueEditor({ open, onClose, board, cfg, league, learne
         <div className="flex-1 space-y-2 overflow-y-auto p-5">
           {!league ? <ManualSetup cfg={cfg} onCreate={onLeagueChange} /> : (
             <>
+              <div className="rounded-xl bg-slate-900 p-4 ring-1 ring-slate-800">
+                <div className="text-sm font-semibold text-white">League rules</div>
+                <label className="mt-2 flex cursor-pointer items-start gap-2.5 text-sm text-slate-300">
+                  <input type="checkbox" checked={!!league.rules?.weekTrades} className="mt-0.5 accent-emerald-500"
+                    onChange={(e) => onLeagueChange({ ...league, rules: { ...league.rules, weekTrades: e.target.checked } })} />
+                  <span>
+                    This league allows 1-week trades
+                    <span className="block text-xs text-slate-500">Players swap for one week, then go back. Adds a &quot;1-week trade&quot; option when you click a player in My League.</span>
+                  </span>
+                </label>
+              </div>
               {league.managers.map((m) => {
                 const r = league.rosters?.find((x) => x.managerId === m.id);
                 return (
