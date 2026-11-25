@@ -39,7 +39,10 @@ function Th({ k, sort, setSort, children, className = "" }: {
   );
 }
 
-export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlayer[]; cfg: LeagueConfig; nonDefault: boolean }) {
+export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
+  board: RankedPlayer[]; cfg: LeagueConfig; nonDefault: boolean; showEspn?: boolean;
+}) {
+  const cols = showEspn ? 13 : 12;
   const [filter, setFilter] = useState<Filter>("ALL");
   const [q, setQ] = useState("");
   const [sort, setSort] = useState<SortKey>("rank");
@@ -107,7 +110,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
       </div>
 
       <div className="overflow-x-auto rounded-xl ring-1 ring-slate-800">
-        <table className="w-full min-w-[1040px] border-collapse text-sm">
+        <table className={`w-full ${showEspn ? "min-w-[1040px]" : "min-w-[960px]"} border-collapse text-sm`}>
           <thead className="sticky top-0 z-10 bg-slate-900">
             <tr className="border-b border-slate-800">
               <Th sort={sort} setSort={setSort} k="rank" className="w-12">Rk</Th>
@@ -116,7 +119,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
               <Th sort={sort} setSort={setSort} className="w-16">Pos</Th>
               <Th sort={sort} setSort={setSort} className="w-12">Tier</Th>
               <Th sort={sort} setSort={setSort} k="adp" className="w-20">ADP</Th>
-              <Th sort={sort} setSort={setSort} k="espn" className="w-20">ESPN ADP</Th>
+              {showEspn && <Th sort={sort} setSort={setSort} k="espn" className="w-20">ESPN ADP</Th>}
               <Th sort={sort} setSort={setSort} k="ppg" className="w-20">27 PPG</Th>
               <Th sort={sort} setSort={setSort} className="w-16">27 Pts</Th>
               <Th sort={sort} setSort={setSort} k="vorp" className="w-16">VORP</Th>
@@ -132,7 +135,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
               return (
                 <Fragment key={p.id}>
                   {tierBreak && (
-                    <tr><td colSpan={13} className="bg-slate-900/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Tier {p.cur.tier}</td></tr>
+                    <tr><td colSpan={cols} className="bg-slate-900/60 px-3 py-1 text-[10px] font-semibold uppercase tracking-widest text-slate-500">Tier {p.cur.tier}</td></tr>
                   )}
                   <tr
                     onClick={() => setOpen(open === p.id ? null : p.id)}
@@ -173,10 +176,12 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
                     <td className="px-2 py-2 tabular-nums text-slate-300">
                       {p.cur.adp}<span className="ml-1 text-[10px] text-slate-500">{roundPick(p.cur.adp, cfg.teams)}</span>
                     </td>
-                    <td className="px-2 py-2 tabular-nums text-slate-300" title="ESPN average draft position · % of ESPN leagues rostered">
-                      {p.espnAdp != null ? fmt(p.espnAdp) : <span className="text-slate-600">—</span>}
-                      {p.espnOwned != null && <div className="text-[10px] text-slate-500">{p.espnOwned.toFixed(0)}% rost</div>}
-                    </td>
+                    {showEspn && (
+                      <td className="px-2 py-2 tabular-nums text-slate-300" title="ESPN average draft position · % of ESPN leagues rostered">
+                        {p.espnAdp != null ? fmt(p.espnAdp) : <span className="text-slate-600">—</span>}
+                        {p.espnOwned != null && <div className="text-[10px] text-slate-500">{p.espnOwned.toFixed(0)}% rost</div>}
+                      </td>
+                    )}
                     <td className="px-2 py-2 font-semibold tabular-nums text-white">{fmt(p.cur.ppg)}</td>
                     <td className="px-2 py-2 tabular-nums text-slate-400">{fmt(p.cur.points, 0)}</td>
                     <td className={`px-2 py-2 tabular-nums font-medium ${p.cur.vorp >= 0 ? "text-emerald-300" : "text-slate-500"}`}>{fmt(p.cur.vorp, 0)}</td>
@@ -186,7 +191,7 @@ export default function BigBoard({ board, cfg, nonDefault }: { board: RankedPlay
                   </tr>
                   {open === p.id && (
                     <tr className="border-b border-slate-800 bg-slate-900/70">
-                      <td colSpan={13} className="px-4 py-3">
+                      <td colSpan={cols} className="px-4 py-3">
                         <div className="grid gap-3 md:grid-cols-[1fr_auto]">
                           <div>
                             <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">

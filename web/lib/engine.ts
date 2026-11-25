@@ -8,23 +8,25 @@ import { POSITIONS } from "./types";
 
 export function defaultToggles(cfg: LeagueConfig): Toggles {
   return {
-    flexCount: cfg.roster.FLEX === 2 ? 2 : 1,
-    ppr: cfg.scoring.rec === 0.5 ? 0.5 : 1,
-    passTd: cfg.scoring.pass_td === 6 ? 6 : 4,
-    tePremium: cfg.scoring.te_premium === 0.5 ? 0.5 : 0,
+    flexCount: cfg.roster.FLEX,
+    superflex: cfg.roster.SUPERFLEX ?? 0,
+    ppr: cfg.scoring.rec,
+    passTd: cfg.scoring.pass_td,
+    tePremium: cfg.scoring.te_premium ?? 0,
   };
 }
 
 export function applyToggles(cfg: LeagueConfig, t: Toggles): LeagueConfig {
   return {
     ...cfg,
-    roster: { ...cfg.roster, FLEX: t.flexCount },
+    roster: { ...cfg.roster, FLEX: t.flexCount, SUPERFLEX: t.superflex },
     scoring: { ...cfg.scoring, rec: t.ppr, pass_td: t.passTd, te_premium: t.tePremium },
   };
 }
 
 export function sameToggles(a: Toggles, b: Toggles) {
-  return a.flexCount === b.flexCount && a.ppr === b.ppr && a.passTd === b.passTd && a.tePremium === b.tePremium;
+  return a.flexCount === b.flexCount && a.superflex === b.superflex && a.ppr === b.ppr &&
+    a.passTd === b.passTd && a.tePremium === b.tePremium;
 }
 
 export function pointsPerGame(s: StatLine, pos: Pos, sc: Scoring): number {
@@ -60,6 +62,14 @@ export function replacementLevels(rows: { pos: Pos; points: number }[], cfg: Lea
     for (const p of cfg.flex_eligible) pools[p].slice(starters[p]).forEach((pts) => cands.push({ pos: p, pts }));
     cands.sort((a, b) => b.pts - a.pts);
     for (const c of cands.slice(0, flexSlots)) starters[c.pos] += 1;
+  }
+  // Superflex: one more flex slot that QBs can fill too.
+  const sfSlots = cfg.teams * (cfg.roster.SUPERFLEX ?? 0);
+  if (sfSlots > 0) {
+    const cands: { pos: Pos; pts: number }[] = [];
+    for (const p of POSITIONS) pools[p].slice(starters[p]).forEach((pts) => cands.push({ pos: p, pts }));
+    cands.sort((a, b) => b.pts - a.pts);
+    for (const c of cands.slice(0, sfSlots)) starters[c.pos] += 1;
   }
   const points = {} as Record<Pos, number>;
   for (const p of POSITIONS) {

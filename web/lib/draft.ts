@@ -16,6 +16,8 @@ export interface BotProfile {
   style: string;
   noise: number;           // stdev of random jitter, in "picks"
   posBias: Partial<Record<Pos, number>>; // early-round lean, in "picks"
+  /** per-phase lean learned from a real manager's past drafts (overrides posBias when present) */
+  posBiasByPhase?: Record<"early" | "mid" | "late", Partial<Record<Pos, number>>>;
   runSensitivity: number;  // 0 = ignores runs, 1 = normal, 2 = herd animal
   rookieBias: number;      // + likes rookies, - avoids them
   vorpWeight: number;
@@ -79,22 +81,26 @@ export function countPositions(roster: RankedPlayer[]): Counts {
 /** Starting slots (incl. FLEX) still empty given the roster's position counts. */
 export function openStarterSlots(c: Counts, cfg: LeagueConfig) {
   const r = cfg.roster;
-  const open: Record<Pos | "FLEX", number> = {
+  const open: Record<Pos | "FLEX" | "SUPERFLEX", number> = {
     QB: Math.max(0, r.QB - c.QB),
     RB: Math.max(0, r.RB - c.RB),
     WR: Math.max(0, r.WR - c.WR),
     TE: Math.max(0, r.TE - c.TE),
     FLEX: 0,
+    SUPERFLEX: 0,
   };
-  const flexFill = cfg.flex_eligible.reduce((s, p) => s + Math.max(0, c[p] - r[p]), 0);
-  open.FLEX = Math.max(0, r.FLEX - flexFill);
+  const flexExcess = cfg.flex_eligible.reduce((s, p) => s + Math.max(0, c[p] - r[p]), 0);
+  open.FLEX = Math.max(0, r.FLEX - flexExcess);
+  // Superflex takes whatever FLEX didn't absorb, plus any extra QBs.
+  const sfFill = Math.max(0, flexExcess - r.FLEX) + Math.max(0, c.QB - r.QB);
+  open.SUPERFLEX = Math.max(0, (r.SUPERFLEX ?? 0) - sfFill);
   return open;
 }
 
 function needScore(pos: Pos, c: Counts, round: number, picksLeft: number, cfg: LeagueConfig): number {
   const open = openStarterSlots(c, cfg);
-  const required = open.QB + open.RB + open.WR + open.TE + open.FLEX;
-  const fillsRequired = open[pos] > 0 || (cfg.flex_eligible.includes(pos) && open.FLEX > 0);
+  const required = open.QB + open.RB + open.WR + open.TE + open.FLEX + open.SUPERFLEX;
+  const fillsRequired = open[pos] > 0 || (cfg.flex_eligible.includes(pos) && open.FLEX > 0) || open.SUPERFLEX > 0;
   // Endgame: must fill the starting lineup with the picks remaining.
   if (picksLeft <= required) return fillsRequired ? 100 : -100;
 
@@ -106,12 +112,14 @@ function needScore(pos: Pos, c: Counts, round: number, picksLeft: number, cfg: L
       if (round >= 10) s += 10;
       return s;
     }
+    if (pos === "QB" && open.SUPERFLEX > 0) return 4 + (round >= 4 ? 3 : 0); // superflex: a 2nd QB starts
     if (c[pos] === slots) return round < 11 ? -40 : -6; // backup only very late
     return -100;
   }
   // RB / WR
   if (open[pos] > 0) return 3 + (round >= 6 ? 3 : 0);
   if (cfg.flex_eligible.includes(pos) && open.FLEX > 0) return 1.5;
+  if (open.SUPERFLEX > 0) return 1;
   if (c[pos] >= 7) return -50;
   if (c[pos] >= 6) return -10;
   // Balance bench: lean toward the thinner of RB/WR
@@ -122,7 +130,7 @@ function needScore(pos: Pos, c: Counts, round: number, picksLeft: number, cfg: L
 function runScore(pos: Pos, recent: RankedPlayer[], sensitivity: number, c: Counts, cfg: LeagueConfig): number {
   const n = recent.filter((p) => p.pos === pos).length;
   if (pos === "QB" || pos === "TE") {
-    if (c[pos] >= cfg.roster[pos]) return 0;
+    if (c[pos] >= cfg.roster[pos] + (pos === "QB" ? cfg.roster.SUPERFLEX ?? 0 : 0)) return 0;
     return n >= 2 ? sensitivity * (n - 1) * 3 : 0;
   }
   return n >= 3 ? sensitivity * (n - 2) * 2 : 0;
@@ -167,7 +175,8 @@ export function botPick(ctx: PickContext, bot: BotProfile, rng: () => number): R
   const scored = scoreCandidates(ctx).map((s) => {
     const p = s.player;
     const run = s.parts.run * bot.runSensitivity;
-    const bias = (bot.posBias[p.pos] ?? 0) * early;
+    const phase = round <= 5 ? "early" : round <= 10 ? "mid" : "late";
+    const bias = bot.posBiasByPhase ? (bot.posBiasByPhase[phase][p.pos] ?? 0) : (bot.posBias[p.pos] ?? 0) * early;
     const rookie = p.rookie ? bot.rookieBias : 0;
     const score = s.parts.value + s.parts.vorp * bot.vorpWeight + s.parts.need + run + bias + rookie + gaussian(rng) * bot.noise;
     return { p, score };
@@ -192,6 +201,11 @@ export function optimalLineup(roster: RankedPlayer[], cfg: LeagueConfig) {
     const p = byPts.find((x) => cfg.flex_eligible.includes(x.pos) && !used.has(x.id)) ?? null;
     if (p) used.add(p.id);
     slots.push({ slot: "FLEX", player: p });
+  }
+  for (let i = 0; i < (cfg.roster.SUPERFLEX ?? 0); i++) {
+    const p = byPts.find((x) => !used.has(x.id)) ?? null;
+    if (p) used.add(p.id);
+    slots.push({ slot: "SFLEX", player: p });
   }
   const bench = byPts.filter((p) => !used.has(p.id));
   const starterPoints = slots.reduce((s, x) => s + (x.player?.cur.points ?? 0), 0);

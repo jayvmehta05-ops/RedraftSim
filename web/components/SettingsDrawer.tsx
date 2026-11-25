@@ -1,6 +1,7 @@
 "use client";
 
-import type { LeagueConfig, Replacement, Toggles } from "@/lib/types";
+import { useState } from "react";
+import type { ImportedLeague, LeagueConfig, Replacement, Toggles } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
 
 interface Props {
@@ -11,11 +12,103 @@ interface Props {
   onChange: (t: Toggles) => void;
   cfg: LeagueConfig;
   replacement: Replacement;
+  league: ImportedLeague | null;
+  onImport: (league: ImportedLeague | null) => void;
+  myManager: string | null;
+  onChooseManager: (id: string | null) => void;
 }
 
-function Seg<T extends number>({ label, hint, value, options, onPick }: {
-  label: string; hint: string; value: T; options: { v: T; label: string }[]; onPick: (v: T) => void;
+function LeagueImport({ league, onImport, myManager, onChooseManager }: Pick<Props, "league" | "onImport" | "myManager" | "onChooseManager">) {
+  const [provider, setProvider] = useState<"sleeper" | "espn">("sleeper");
+  const [id, setId] = useState("");
+  const [season, setSeason] = useState(2026);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const run = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      const r = await fetch(`/api/league?provider=${provider}&id=${encodeURIComponent(id.trim())}&season=${season}`);
+      const body = await r.json();
+      if (!r.ok) throw new Error(body.error ?? `Import failed (${r.status})`);
+      onImport(body as ImportedLeague);
+      setId("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Import failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (league) {
+    const picks = league.drafts.reduce((s, d) => s + d.picks.length, 0);
+    return (
+      <div className="py-4">
+        <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Your league</h3>
+        <div className="rounded-lg bg-emerald-500/10 p-3 ring-1 ring-emerald-500/30">
+          <div className="text-sm font-semibold text-white">{league.name}</div>
+          <div className="text-xs text-slate-400">
+            {league.provider === "sleeper" ? "Sleeper" : "ESPN"} · {league.season} · {league.teams} teams · {league.drafts.length} past draft{league.drafts.length === 1 ? "" : "s"} ({picks} picks)
+          </div>
+        </div>
+        {league.managers.length > 0 && (
+          <label className="mt-3 block text-xs text-slate-400">
+            Which team is yours? (the others become mock-draft bots)
+            <select value={myManager ?? ""} onChange={(e) => onChooseManager(e.target.value || null)}
+              className="mt-1 w-full rounded-md bg-slate-800 px-2 py-1.5 text-sm text-slate-200 ring-1 ring-slate-700">
+              <option value="">Not set</option>
+              {league.managers.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </label>
+        )}
+        {league.notes.length > 0 && (
+          <ul className="mt-3 space-y-0.5 text-[11px] text-amber-300/80">
+            {league.notes.map((n) => <li key={n}>• {n}</li>)}
+          </ul>
+        )}
+        <button onClick={() => onImport(null)} className="mt-3 text-xs text-slate-400 underline hover:text-white">
+          Remove league and go back to the site defaults
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="py-4">
+      <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-400">Import your league</h3>
+      <p className="mb-2 text-[11px] text-slate-500">Loads your roster slots, scoring and past drafts. Sleeper works for any league; ESPN leagues must be public.</p>
+      <div className="flex gap-1 rounded-lg bg-slate-800/70 p-1">
+        {(["sleeper", "espn"] as const).map((p) => (
+          <button key={p} onClick={() => setProvider(p)}
+            className={`flex-1 rounded-md px-3 py-1.5 text-sm ${provider === p ? "bg-slate-600 font-semibold text-white" : "text-slate-300"}`}>
+            {p === "sleeper" ? "Sleeper" : "ESPN"}
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-2">
+        <input value={id} onChange={(e) => setId(e.target.value)} placeholder="League ID (from the league URL)"
+          className="min-w-0 flex-1 rounded-md bg-slate-800 px-2 py-1.5 text-sm text-white ring-1 ring-slate-700 placeholder:text-slate-500 focus:outline-none focus:ring-emerald-500" />
+        {provider === "espn" && (
+          <select value={season} onChange={(e) => setSeason(Number(e.target.value))}
+            className="rounded-md bg-slate-800 px-2 py-1.5 text-sm text-slate-200 ring-1 ring-slate-700">
+            {[2026, 2025].map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        )}
+      </div>
+      <button disabled={busy || id.trim().length < 3} onClick={run}
+        className="mt-2 w-full rounded-lg bg-emerald-500 py-2 text-sm font-bold text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">
+        {busy ? "Importing…" : "Import league"}
+      </button>
+      {error && <p className="mt-2 text-xs text-rose-300">{error}</p>}
+    </div>
+  );
+}
+
+function Seg({ label, hint, value, options: preset, onPick }: {
+  label: string; hint: string; value: number; options: { v: number; label: string }[]; onPick: (v: number) => void;
 }) {
+  // An imported league can carry a value outside the presets (e.g. 0.25 PPR); show it as its own option.
+  const options = preset.some((o) => o.v === value) ? preset : [...preset, { v: value, label: `${value} (league)` }];
   return (
     <div className="py-3">
       <div className="mb-1.5 flex items-baseline justify-between">
@@ -37,7 +130,7 @@ function Seg<T extends number>({ label, hint, value, options, onPick }: {
   );
 }
 
-export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement }: Props) {
+export default function SettingsDrawer({ open, onClose, toggles, defaults, onChange, cfg, replacement, league, onImport, myManager, onChooseManager }: Props) {
   const set = (patch: Partial<Toggles>) => onChange({ ...toggles, ...patch });
   const r = cfg.roster;
   return (
@@ -58,8 +151,11 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
           <button onClick={onClose} className="rounded-md p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Close settings">✕</button>
         </div>
         <div className="flex-1 divide-y divide-slate-800 overflow-y-auto px-5">
+          <LeagueImport league={league} onImport={onImport} myManager={myManager} onChooseManager={onChooseManager} />
           <Seg label="FLEX spots" hint="RB / WR / TE" value={toggles.flexCount}
             options={[{ v: 1, label: "1 FLEX" }, { v: 2, label: "2 FLEX" }]} onPick={(v) => set({ flexCount: v })} />
+          <Seg label="Superflex" hint="flex spot a QB can fill" value={toggles.superflex}
+            options={[{ v: 0, label: "Off" }, { v: 1, label: "On" }]} onPick={(v) => set({ superflex: v })} />
           <Seg label="Reception scoring" hint="points per catch" value={toggles.ppr}
             options={[{ v: 1, label: "Full PPR" }, { v: 0.5, label: "Half PPR" }]} onPick={(v) => set({ ppr: v })} />
           <Seg label="Passing TD" hint="points" value={toggles.passTd}
@@ -70,7 +166,7 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
           <div className="py-4">
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Active league</h3>
             <p className="text-sm text-slate-300">
-              {cfg.teams} teams · {r.QB} QB · {r.RB} RB · {r.WR} WR · {r.TE} TE · {toggles.flexCount} FLEX{r.K ? ` · ${r.K} K` : ""}{r.DST ? ` · ${r.DST} D/ST` : ""} · {r.BENCH} BN · {cfg.draft_rounds} rounds
+              {cfg.teams} teams · {r.QB} QB · {r.RB} RB · {r.WR} WR · {r.TE} TE · {toggles.flexCount} FLEX{r.SUPERFLEX ? ` · ${r.SUPERFLEX} SFLEX` : ""}{r.K ? ` · ${r.K} K` : ""}{r.DST ? ` · ${r.DST} D/ST` : ""} · {r.BENCH} BN · {cfg.draft_rounds} rounds
             </p>
             <h3 className="mb-2 mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">Replacement level (season pts)</h3>
             <div className="grid grid-cols-4 gap-2 text-center">
@@ -92,7 +188,7 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
             onClick={() => onChange(defaults)}
             className="w-full rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:bg-slate-800"
           >
-            Reset to league_settings.json defaults
+            {league ? `Reset to ${league.name} settings` : "Reset to league_settings.json defaults"}
           </button>
         </div>
       </aside>

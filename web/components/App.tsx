@@ -1,9 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { BoardData, LeagueConfig, Toggles, TrendData } from "@/lib/types";
+import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from "@/lib/types";
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
+import { buildLeaguemateBots } from "@/lib/leaguemates";
 import BigBoard from "./BigBoard";
+import KeeperCalc from "./KeeperCalc";
+import LiveDraft from "./LiveDraft";
 import MockDraft from "./MockDraft";
 import SettingsDrawer from "./SettingsDrawer";
 import TrendTracker from "./TrendTracker";
@@ -11,16 +14,71 @@ import TrendTracker from "./TrendTracker";
 const TABS = [
   { id: "board", label: "2027 Big Board" },
   { id: "mock", label: "Mock Draft Room" },
+  { id: "live", label: "Live Draft" },
+  { id: "keepers", label: "Keepers" },
   { id: "trends", label: "Weekly Trends" },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 const STORAGE_KEY = "redraft27.toggles";
+const LEAGUE_KEY = "redraft27.league";
+const ME_KEY = "redraft27.myManager";
 
-export default function App({ data, trends, config }: { data: BoardData; trends: TrendData; config: LeagueConfig }) {
+/** The site's default config with an imported league's teams, roster, scoring and draft length applied. */
+function withLeague(config: LeagueConfig, league: ImportedLeague | null): LeagueConfig {
+  if (!league) return config;
+  return {
+    ...config,
+    league_name: league.name,
+    teams: league.teams,
+    draft_rounds: league.draftRounds,
+    roster: { ...league.roster },
+    scoring: { ...league.scoring },
+  };
+}
+
+function save(key: string, value: unknown) {
+  try {
+    if (value == null) localStorage.removeItem(key);
+    else localStorage.setItem(key, typeof value === "string" ? value : JSON.stringify(value));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export default function App({ data, trends, config: siteConfig }: { data: BoardData; trends: TrendData; config: LeagueConfig }) {
+  const [league, setLeague] = useState<ImportedLeague | null>(null);
+  const [myManager, setMyManager] = useState<string | null>(null);
+  const config = useMemo(() => withLeague(siteConfig, league), [siteConfig, league]);
+  const leaguemates = useMemo(() => (league ? buildLeaguemateBots(league) : []), [league]);
   const defaults = useMemo(() => defaultToggles(config), [config]);
   const [toggles, setToggles] = useState<Toggles>(defaults);
   const [tab, setTab] = useState<Tab>("board");
   const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // Restore an imported league (best effort)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(LEAGUE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (saved) setLeague(JSON.parse(saved));
+      setMyManager(localStorage.getItem(ME_KEY));
+    } catch {
+      /* storage unavailable */
+    }
+  }, []);
+  const importLeague = (lg: ImportedLeague | null) => {
+    setLeague(lg);
+    save(LEAGUE_KEY, lg);
+    setMyManager(null);
+    save(ME_KEY, null);
+    const t = defaultToggles(withLeague(siteConfig, lg));
+    setToggles(t);
+    save(STORAGE_KEY, t);
+  };
+  const chooseManager = (id: string | null) => {
+    setMyManager(id);
+    save(ME_KEY, id);
+  };
 
   // Restore per-browser settings (best effort)
   useEffect(() => {
@@ -48,9 +106,11 @@ export default function App({ data, trends, config }: { data: BoardData; trends:
   const updated = m.lastIngest ? new Date(m.lastIngest).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "—";
 
   const chips = [
+    ...(league ? [league.name] : []),
     `${cfg.teams} teams`,
     `${cfg.roster.FLEX} FLEX`,
-    cfg.scoring.rec === 1 ? "Full PPR" : "Half PPR",
+    ...(cfg.roster.SUPERFLEX ? ["Superflex"] : []),
+    cfg.scoring.rec === 1 ? "Full PPR" : cfg.scoring.rec === 0.5 ? "Half PPR" : cfg.scoring.rec === 0 ? "Standard" : `${cfg.scoring.rec} PPR`,
     `${cfg.scoring.pass_td}-pt pass TD`,
     ...(cfg.scoring.te_premium ? [`TE +${cfg.scoring.te_premium}`] : []),
   ];
@@ -88,12 +148,18 @@ export default function App({ data, trends, config }: { data: BoardData; trends:
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-5">
-        {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} />}
-        {tab === "mock" && <MockDraft board={board} cfg={cfg} />}
+        {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} showEspn={m.publication?.show_espn_fields !== false} />}
+        {tab === "mock" && <MockDraft board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} />}
+        {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
+        {tab === "keepers" && <KeeperCalc board={board} cfg={cfg} />}
         {tab === "trends" && <TrendTracker board={board} trends={trends} throughWeek={m.throughWeek} />}
       </main>
 
       <footer className="mx-auto max-w-7xl px-4 pb-8 text-[11px] leading-relaxed text-slate-600">
+        <div className="mb-2 flex gap-4 text-xs">
+          <a href="/accuracy" className="text-emerald-400/80 hover:text-emerald-300">How accurate are these projections?</a>
+          <a href="/risers" className="text-emerald-400/80 hover:text-emerald-300">This week&apos;s risers &amp; fallers</a>
+        </div>
         Sources: Sleeper public API (players, injuries, depth charts), ESPN fantasy API (ADP, roster %, rest-of-season
         projections{m.marketSource === "espn" ? "; ESPN ADP is the market signal" : "; ESPN unavailable, Sleeper rank used as market"}),
         nflverse weekly player stats, DynastyProcess ID map,
@@ -101,7 +167,8 @@ export default function App({ data, trends, config }: { data: BoardData; trends:
       </footer>
 
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} toggles={toggles} defaults={defaults}
-        onChange={updateToggles} cfg={cfg} replacement={replacement} />
+        onChange={updateToggles} cfg={cfg} replacement={replacement}
+        league={league} onImport={importLeague} myManager={myManager} onChooseManager={chooseManager} />
     </div>
   );
 }

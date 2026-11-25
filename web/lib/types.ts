@@ -70,6 +70,8 @@ export interface BoardMeta {
   configHash: string;
   /** which market feeds the ADP blend: ESPN ADP, or Sleeper search rank as fallback */
   marketSource: "espn" | "sleeper";
+  /** publication switches from league_settings.json */
+  publication?: { show_headshots: boolean; show_espn_fields: boolean };
 }
 
 export interface BoardData {
@@ -106,7 +108,7 @@ export interface LeagueConfig {
   teams: number;
   draft_rounds: number;
   /** K and DST are drafted but not projected; the mock draft reserves its final rounds for them. */
-  roster: { QB: number; RB: number; WR: number; TE: number; FLEX: number; K?: number; DST?: number; BENCH: number };
+  roster: { QB: number; RB: number; WR: number; TE: number; FLEX: number; SUPERFLEX?: number; K?: number; DST?: number; BENCH: number };
   flex_eligible: Pos[];
   scoring: Scoring;
   projection: {
@@ -119,12 +121,13 @@ export interface LeagueConfig {
   };
 }
 
-/** The four quick toggles exposed in the Settings drawer. */
+/** Quick toggles in the Settings drawer. Values outside the preset options come from an imported league. */
 export interface Toggles {
-  flexCount: 1 | 2;
-  ppr: 1 | 0.5;
-  passTd: 4 | 6;
-  tePremium: 0 | 0.5;
+  flexCount: number;
+  superflex: number;
+  ppr: number;
+  passTd: number;
+  tePremium: number;
 }
 
 export interface RankedPlayer extends RawPlayer {
@@ -143,4 +146,33 @@ export interface RankedPlayer extends RawPlayer {
     /** ESPN rest-of-season projection scored with the active settings */
     espnRosPpg: number | null;
   };
+}
+
+// ------------------------------------------------------------------ league import
+export interface LeagueDraftPick {
+  round: number;
+  pick: number;
+  managerId: string;
+  pos: string;
+  name: string;
+}
+export interface LeagueDraft {
+  season: string;
+  type: string;
+  picks: LeagueDraftPick[];
+}
+/** A league imported from Sleeper or ESPN by /api/league. */
+export interface ImportedLeague {
+  provider: "sleeper" | "espn";
+  leagueId: string;
+  season: string;
+  name: string;
+  teams: number;
+  roster: LeagueConfig["roster"];
+  scoring: Scoring;
+  draftRounds: number;
+  /** approximations and rules the model can't represent */
+  notes: string[];
+  managers: { id: string; name: string }[];
+  drafts: LeagueDraft[];
 }

@@ -8,6 +8,8 @@ import {
   BOT_PROFILES, type BotProfile, botPick, countPositions, letterGrade, mulberry32, optimalLineup,
   scoreCandidates, teamOnClock, teamPickIndices,
 } from "@/lib/draft";
+import type { LeaguemateProfile } from "@/lib/leaguemates";
+import { encodeMock } from "@/lib/share";
 import { Flags, POS_CELL, PosBadge, TierBadge, fmt } from "./ui";
 
 type Phase = "setup" | "live" | "done";
@@ -26,7 +28,9 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return a;
 }
 
-export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: LeagueConfig }) {
+export default function MockDraft({ board, cfg, leaguemates = [], myManager = null, leagueName = null }: {
+  board: RankedPlayer[]; cfg: LeagueConfig; leaguemates?: LeaguemateProfile[]; myManager?: string | null; leagueName?: string | null;
+}) {
   const teams = cfg.teams;
   // K and D/ST aren't projected: simulate the skill-position rounds and reserve the last rounds for them.
   const reserved: { slot: string; n: number }[] = [
@@ -41,9 +45,13 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
   const [slot, setSlot] = useState(1);
   const [speed, setSpeed] = useState(1);
   const [autoMe, setAutoMe] = useState(false);
+  const [useLeague, setUseLeague] = useState(true);
+  const [shareMsg, setShareMsg] = useState<string | null>(null);
+  const opponents = leaguemates.filter((m) => m.managerId !== myManager);
+  const leagueMode = useLeague && opponents.length > 0;
   const [paused, setPaused] = useState(false);
   const [picks, setPicks] = useState<string[]>([]);
-  const [locked, setLocked] = useState<{ board: RankedPlayer[]; cfg: LeagueConfig; userTeam: number } | null>(null);
+  const [locked, setLocked] = useState<{ board: RankedPlayer[]; cfg: LeagueConfig; userTeam: number; leagueName: string | null } | null>(null);
   const [bots, setBots] = useState<(BotProfile | null)[]>([]);
   const [posFilter, setPosFilter] = useState<Pos | "ALL">("ALL");
   const [q, setQ] = useState("");
@@ -103,16 +111,21 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, paused, pickIdx, onClock, autoMe, speed]);
 
-  const start = (startSlot: number) => {
-    const seed = Math.floor(Math.random() * 2 ** 31);
+  // Seeded from the click's timestamp, so every mock plays out differently.
+  const start = (startSlot: number, entropy: number) => {
+    const seed = Math.floor(entropy * 1000) % 2 ** 31;
     const rng = mulberry32(seed);
     rngRef.current = rng;
-    const order = shuffle(BOT_PROFILES, rng);
+    // Leaguemates first (their real tendencies), topped up with stock personalities if the league is short.
+    const order: BotProfile[] = leagueMode
+      ? [...shuffle(opponents, rng), ...shuffle(BOT_PROFILES, rng)]
+      : shuffle(BOT_PROFILES, rng);
     const b: (BotProfile | null)[] = [];
     let k = 0;
     for (let t = 0; t < teams; t++) b.push(t === startSlot - 1 ? null : order[k++ % order.length]);
     setBots(b);
-    setLocked({ board, cfg, userTeam: startSlot - 1 });
+    setLocked({ board, cfg, userTeam: startSlot - 1, leagueName: leagueMode ? leagueName : null });
+    setShareMsg(null);
     setPicks([]);
     setPaused(false);
     setPhase("live");
@@ -139,7 +152,7 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
   if (phase === "setup") {
     return (
       <section className="mx-auto max-w-3xl rounded-2xl bg-slate-900 p-6 ring-1 ring-slate-800">
-        <h2 className="text-lg font-semibold text-white">12-Team Mock Draft Room</h2>
+        <h2 className="text-lg font-semibold text-white">{teams}-Team Mock Draft Room</h2>
         <p className="mt-1 text-sm text-slate-400">
           {cfg.draft_rounds}-round snake draft vs. {teams - 1} AI bots drafting from the live 2027 ADP + VORP board with roster-need logic for
           {" "}{cfg.roster.QB} QB · {cfg.roster.RB} RB · {cfg.roster.WR} WR · {cfg.roster.TE} TE · {cfg.roster.FLEX} FLEX.
@@ -170,10 +183,25 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
           </label>
         </div>
         <div className="mt-5 rounded-lg bg-slate-800/50 p-3 text-xs text-slate-400">
+          {opponents.length > 0 && (
+            <div className="mb-2 flex rounded-lg bg-slate-900 p-1">
+              <button onClick={() => setUseLeague(true)}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold ${leagueMode ? "bg-emerald-500 text-slate-950" : "text-slate-400"}`}>
+                My leaguemates{leagueName ? ` (${leagueName})` : ""}
+              </button>
+              <button onClick={() => setUseLeague(false)}
+                className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold ${!leagueMode ? "bg-slate-600 text-white" : "text-slate-400"}`}>
+                AI personalities
+              </button>
+            </div>
+          )}
           <div className="mb-1 font-semibold text-slate-300">Your opponents</div>
-          {BOT_PROFILES.map((b) => <span key={b.name} className="mr-3 inline-block">{b.name} <span className="text-slate-500">— {b.style}</span></span>)}
+          {(leagueMode ? opponents : BOT_PROFILES).map((b) => <span key={b.name} className="mr-3 inline-block">{b.name} <span className="text-slate-500">— {b.style}</span></span>)}
+          {leagueMode && !myManager && (
+            <p className="mt-2 text-amber-300/80">Tip: pick your own team in Settings → Your league so you aren&apos;t also drafting against yourself.</p>
+          )}
         </div>
-        <button onClick={() => start(slot)} className="mt-6 w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400">
+        <button onClick={(e) => start(slot, e.timeStamp + performance.timeOrigin)} className="mt-6 w-full rounded-xl bg-emerald-500 py-3 text-sm font-bold text-slate-950 hover:bg-emerald-400">
           Start mock draft from 1.{String(slot).padStart(2, "0")}
         </button>
       </section>
@@ -185,6 +213,28 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
   const mean = results.reduce((s, r) => s + r.starterPoints, 0) / teams;
   const sd = Math.sqrt(results.reduce((s, r) => s + (r.starterPoints - mean) ** 2, 0) / teams) || 1;
   const ranked = [...results].sort((a, b) => b.starterPoints - a.starterPoints);
+  const share = async () => {
+    const mine = results[userTeam];
+    const myPickIdx = teamPickIndices(userTeam, teams, rounds);
+    const code = encodeMock({
+      v: 1, t: teams, s: userTeam + 1, r: ranked.findIndex((r) => r.t === userTeam) + 1,
+      g: letterGrade((mine.starterPoints - mean) / sd), pts: Math.round(mine.starterPoints),
+      lg: locked?.leagueName ?? undefined,
+      p: myPickIdx.slice(0, 9).map((i) => {
+        const pl = byId.get(picks[i]);
+        return [pl?.name ?? "?", pl?.pos ?? "", roundPick(i + 1, teams)] as [string, string, string];
+      }),
+    });
+    const url = `${window.location.origin}/share/${code}`;
+    try {
+      const canShare = typeof navigator.share === "function" && window.matchMedia("(pointer: coarse)").matches;
+      if (canShare) await navigator.share({ title: "My 2027 mock draft", url });
+      else await navigator.clipboard.writeText(url);
+      setShareMsg(canShare ? "Shared!" : "Link copied!");
+    } catch {
+      window.prompt("Copy your share link:", url);
+    }
+  };
   const myLineup = results[userTeam];
 
   const list = available.filter((p) =>
@@ -217,6 +267,11 @@ export default function MockDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
         <div className="ml-auto flex gap-2">
           {phase === "live" && (
             <button onClick={() => setPaused((p) => !p)} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700">{paused ? "Resume" : "Pause"}</button>
+          )}
+          {phase === "done" && (
+            <button onClick={share} className="rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 hover:bg-emerald-400">
+              {shareMsg ?? "Share result"}
+            </button>
           )}
           <button onClick={() => setPhase("setup")} className="rounded-lg bg-slate-800 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700">New mock</button>
         </div>
