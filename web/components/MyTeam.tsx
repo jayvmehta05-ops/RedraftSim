@@ -132,7 +132,7 @@ function PlayerActions({ onRate, cfg, player, owner, isMine, weekTrades, weeksLe
           <>
             {longShot && <p className="text-xs text-amber-300">Nothing here is likely to be accepted. These are the closest offers, so you can see the gap.</p>}
             <div className="grid gap-3 md:grid-cols-2">
-              {results.map((t, i) => (
+              {results.map((t) => (
                 <TradeCard key={tradeKey(t)} t={t} cfg={cfg} onRate={(r) => onRate(t, r)} partnerName={mode === "shop" ? (t.partnerName ?? "Team") : owner.name}
                   note={mode === "week" ? "1-week trade: values are this week's projected points, and everyone goes back after the week." : undefined} />
               ))}
