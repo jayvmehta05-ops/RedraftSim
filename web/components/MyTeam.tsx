@@ -10,6 +10,8 @@ import type { ImportedLeague, LeagueConfig, Pos, RankedPlayer } from "@/lib/type
 import { POSITIONS } from "@/lib/types";
 import { IconLock, IconUnlock } from "./icons";
 import { TradeCard, tradeKey } from "./TradeAssistant";
+import { type LivePlayer, livePoints, useLiveWeek } from "@/lib/live";
+import { statusLabel } from "@/lib/weekly";
 import { applyTradeRating, reportTradeRating } from "./RateTrade";
 import type { Rating } from "@/lib/tradeTuning";
 import { type LeagueTeam, useLeagueTeams } from "./useLeagueTeams";
@@ -23,8 +25,10 @@ type TradeEval = BaseTrade & { partnerName?: string };
 /** Rest-of-season points per game: ESPN's projection when available, else this season's average. */
 const rosPpg = (p: RankedPlayer) => p.cur.espnRosPpg ?? (p.g26 > 0 ? p.cur.ppg26 : null);
 
-function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked }: {
+function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked, live }: {
   slot?: string; x: Valued | null; dim?: boolean; selected?: boolean; onClick?: () => void; rosRank?: number; keeper?: boolean; locked?: boolean;
+  /** this week's live points and game status (undefined until live scores load) */
+  live?: LivePlayer;
 }) {
   if (!x) {
     return (
@@ -40,31 +44,44 @@ function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked }:
   const hurt = p.injury && p.injury !== "Active";
   return (
     <button type="button" onClick={onClick} aria-expanded={selected}
-      className={`flex w-full flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-800/70 px-4 py-2.5 text-left transition last:border-0 hover:bg-slate-900 ${selected ? "bg-slate-900 ring-1 ring-emerald-500/40 ring-inset" : dim ? "bg-slate-950/60" : "bg-slate-950"}`}>
-      {slot && <span className="w-12 text-[11px] font-bold text-slate-400">{slot}</span>}
+      className={`flex w-full flex-wrap items-center gap-x-2 gap-y-1 border-b border-slate-800/70 px-3 py-2.5 sm:gap-x-3 sm:px-4 text-left transition last:border-0 hover:bg-slate-900 ${selected ? "bg-slate-900 ring-1 ring-emerald-500/40 ring-inset" : dim ? "bg-slate-950/60" : "bg-slate-950"}`}>
+      {slot && <span className="w-9 text-[11px] font-bold text-slate-400 sm:w-12">{slot}</span>}
       <div className="flex min-w-0 flex-1 items-center gap-2.5">
         {img ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={img} alt="" loading="lazy" className="h-8 w-8 shrink-0 rounded-full bg-slate-800 object-cover" />
+          <img src={img} alt="" loading="lazy" className="hidden h-8 w-8 shrink-0 rounded-full bg-slate-800 object-cover sm:block" />
         ) : (
-          <span className="h-8 w-8 shrink-0 rounded-full bg-slate-800" />
+          <span className="hidden h-8 w-8 shrink-0 rounded-full bg-slate-800 sm:block" />
         )}
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <span className={`truncate font-semibold ${dim ? "text-slate-300" : "text-white"}`}>{p.name}</span>
-            {hurt && <span className="rounded bg-red-500/20 px-1 text-[10px] font-bold text-red-300" title={p.injuryPart ?? undefined}>{p.injury}</span>}
+            {hurt && <span className="shrink-0 rounded bg-red-500/20 px-1 text-[10px] font-bold text-red-300" title={[p.injury, p.injuryPart].filter(Boolean).join(": ")}>{statusLabel(p.injury)}</span>}
             {locked && <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 text-[10px] font-bold text-amber-300" title="Can't be traded right now"><IconLock className="h-2.5 w-2.5" />LOCKED</span>}
             <Flags flags={p.flags.filter((f) => f !== "rookie")} notes={p.notes} />
           </div>
-          <div className="text-[11px] text-slate-500">{p.team || "FA"}{p.age ? ` · ${p.age.toFixed(0)} yo` : ""}</div>
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            {/* phones: the rank badge sits here so the name keeps its room */}
+            <span className="sm:hidden"><PosBadge pos={p.pos} rank={rosRank} /></span>
+            <span className="truncate">{p.team || "FA"}{p.age ? ` · ${p.age.toFixed(0)} yo` : ""}</span>
+          </div>
         </div>
       </div>
-      <span title={`Rank at ${p.pos} for the rest of ${SOURCE}`}><PosBadge pos={p.pos} rank={rosRank} /></span>
-      <div className="w-16 text-right" title={`Projected points per game for the rest of ${SOURCE}`}>
+      <span className="hidden sm:inline" title={`Rank at ${p.pos} for the rest of ${SOURCE}`}><PosBadge pos={p.pos} rank={rosRank} /></span>
+      <div className="w-14 text-right sm:w-16" title={`Projected points per game for the rest of ${SOURCE}`}>
         <div className="text-sm tabular-nums text-slate-200">{fmt(ros)}</div>
         <div className="text-[10px] text-slate-500">ROS PPG</div>
       </div>
-      <div className="w-16 text-right" title={`Points per game so far in ${SOURCE}`}>
+      {live && (
+        <div className="w-16 text-right sm:w-[4.5rem]" title={live.state === "in" ? "Fantasy points so far in this game, with your league's scoring (updates every minute)" : live.state === "post" ? "Fantasy points this week, with your league's scoring" : live.state === "bye" ? "On bye this week" : "Kickoff time"}>
+          <div className={`text-sm font-semibold tabular-nums ${live.state === "in" ? "text-emerald-300" : live.pts != null ? "text-white" : "text-slate-500"}`}>{live.pts != null ? fmt(live.pts) : "—"}</div>
+          <div className="flex items-center justify-end gap-1 text-[10px] text-slate-500">
+            {live.state === "in" && <span className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-emerald-400" aria-label="live" />}
+            <span className="truncate">{live.label}</span>
+          </div>
+        </div>
+      )}
+      <div className={`${live ? "hidden sm:block" : ""} w-16 text-right`} title={`Points per game so far in ${SOURCE}`}>
         <div className="text-sm tabular-nums text-slate-200">{p.g26 > 0 ? fmt(p.cur.ppg26) : "—"}</div>
         <div className="text-[10px] text-slate-500">{SOURCE} PPG</div>
       </div>
@@ -169,6 +186,19 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
   const me = teams.find((t) => t.id === myManager);
   const viewing = teams.find((t) => t.id === teamId) ?? me;
   const isMine = viewing?.id === myManager;
+  // This week's live points (refreshes every minute while games are on)
+  const liveWeek = useLiveWeek(tradesOpen || weeksLeft > 0);
+  const liveFor = (p: RankedPlayer) => (liveWeek ? livePoints(p, liveWeek, cfg) : undefined);
+  // The lineup actually set on Sleeper/ESPN for the team being viewed, for its live score this week
+  const setLineup = useMemo(() => {
+    const r = league.rosters?.find((x) => x.managerId === viewing?.id);
+    if (!r?.starters?.length || !viewing) return null;
+    const ids = new Set(r.starters);
+    return viewing.roster.filter((x) => ids.has(r.idType === "espn" ? String(x.p.espnId ?? "") : x.p.id)).map((x) => x.p);
+  }, [league.rosters, viewing]);
+  const liveTotal = liveWeek && setLineup
+    ? setLineup.reduce((s, p) => s + (livePoints(p, liveWeek, cfg).pts ?? 0), 0) : null;
+  const anyLive = !!liveWeek && !!setLineup?.some((p) => livePoints(p, liveWeek, cfg).state === "in");
   const power = useMemo(() => powerRankings(teams, cfg), [teams, cfg]);
   const view = useMemo(() => {
     if (!viewing) return null;
@@ -222,6 +252,7 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
   const rowFor = (x: Valued | null, slot: string, dim?: boolean, key?: string) => (
     <div key={key ?? x?.p.id ?? slot}>
       <PlayerRow slot={slot} x={x} dim={dim} selected={!!x && selected === x.p.id} rosRank={x ? rosRanks.get(x.p.id) : undefined} keeper={keeper} locked={!!x && locked.has(x.p.id)}
+        live={x ? liveFor(x.p) : undefined}
         onClick={x ? () => setSelected(selected === x.p.id ? null : x.p.id) : undefined} />
       {x && selected === x.p.id && (
         <PlayerActions key={`${viewing.id}-${x.p.id}`} cfg={cfg} player={x.p}
@@ -247,9 +278,19 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
           </div>
         </div>
         <HorizonToggle horizon={horizon} setHorizon={setHorizon} keeper={keeper} />
-        <div className="ml-auto text-right">
-          <div className="text-lg font-black tabular-nums text-white">{fmt(view.total, 0)}</div>
-          <div className="text-[10px] text-slate-500">projected lineup pts</div>
+        <div className="ml-auto flex gap-4 text-right">
+          {liveTotal != null && (
+            <div title={`Live points this week for the lineup ${isMine ? "you have" : "they have"} set on ${league.provider === "espn" ? "ESPN" : "Sleeper"}, with your league's scoring`}>
+              <div className={`flex items-center justify-end gap-1.5 text-lg font-black tabular-nums ${anyLive ? "text-emerald-300" : "text-white"}`}>
+                {anyLive && <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-400" aria-label="live" />}{fmt(liveTotal)}
+              </div>
+              <div className="text-[10px] text-slate-500">week {liveWeek?.week} {anyLive ? "· live" : "pts"}</div>
+            </div>
+          )}
+          <div>
+            <div className="text-lg font-black tabular-nums text-white">{fmt(view.total, 0)}</div>
+            <div className="text-[10px] text-slate-500">projected lineup pts</div>
+          </div>
         </div>
       </div>
 

@@ -5,6 +5,7 @@
  * Fairness: simulation i uses the same seed (same bot lineup, same random draws) for every strategy, so
  * differences come from the strategy rather than luck ("common random numbers").
  */
+import { type BotTuning, tuneBot } from "./botTuning";
 import {
   BOT_PROFILES, type BotProfile, botPick, countPositions, mulberry32, optimalLineup, scoreCandidates, teamOnClock,
   teamPickIndices, type Counts,
@@ -38,6 +39,8 @@ export interface LabSetup {
   userTeam: number;
   /** your real leaguemates (seated first); stock personalities fill any empty seats, like the mock draft */
   opponents: BotProfile[];
+  /** your end-of-mock feedback tuning, applied to every bot like in the mock draft */
+  tuning?: BotTuning | null;
 }
 
 export interface DraftOutcome {
@@ -60,7 +63,7 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
 export function simulateDraft(setup: LabSetup, strategy: Strategy, seed: number): DraftOutcome {
   const { byAdp, cfg, teams, rounds, userTeam } = setup;
   const rng = mulberry32(seed);
-  const seatOrder = [...shuffle(setup.opponents, rng), ...shuffle(BOT_PROFILES, rng)];
+  const seatOrder = [...shuffle(setup.opponents, rng), ...shuffle(BOT_PROFILES, rng)].map((b) => tuneBot(b, setup.tuning ?? null));
   const seats = shuffle(Array.from({ length: teams }, (_, t) => t).filter((t) => t !== userTeam), rng);
   const bots: (BotProfile | null)[] = Array.from({ length: teams }, () => null);
   seats.forEach((t, i) => (bots[t] = seatOrder[i % seatOrder.length]));

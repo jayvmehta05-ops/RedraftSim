@@ -1,5 +1,6 @@
 "use client";
 
+import { loadBotTuning } from "@/lib/botTuning";
 import { useRef, useState } from "react";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { STRATEGIES, type DraftOutcome, type StrategyResult, simulateDraft, summarize } from "@/lib/strategyLab";
@@ -28,7 +29,7 @@ export default function StrategyLab({ board, cfg, leaguemates, myManager, league
     if (!strategies.length) return;
     const byAdp = [...board].sort((a, b) => a.cur.adp - b.cur.adp);
     const leagueMode = useLeague && opponentsAll.length > 0;
-    const setup = { byAdp, cfg, teams, rounds, userTeam: slot - 1, opponents: leagueMode ? opponentsAll : [] };
+    const setup = { byAdp, cfg, teams, rounds, userTeam: slot - 1, opponents: leagueMode ? opponentsAll : [], tuning: loadBotTuning() };
     const outcomes = new Map<string, DraftOutcome[]>(strategies.map((s) => [s.id, []]));
     let i = 0;
     cancel.current = false;
@@ -61,7 +62,7 @@ export default function StrategyLab({ board, cfg, leaguemates, myManager, league
         <p className="mt-1 text-sm text-slate-400">
           Runs full simulated drafts from your slot with your team following each strategy, against the same bots as the mock draft,
           and compares the projected starting lineups. Every strategy faces identical opponents and luck, so the differences come
-          from the strategy.
+          from the strategy. Bots include any tuning from your end-of-mock feedback.
         </p>
         <div className="mt-4 grid gap-4 md:grid-cols-[1fr_auto]">
           <div>
