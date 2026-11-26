@@ -6,7 +6,7 @@ import type { ImportedLeague, LeagueConfig, Pos, RankedPlayer } from "@/lib/type
 import { POSITIONS } from "@/lib/types";
 import { SOURCE } from "@/lib/season";
 import {
-  type Horizon, type Partner, type TradeEval, type Valued, evaluateTrade, findTrades, playerValue, positionStrength,
+  type Horizon, type Partner, type TradeEval, type Valued, evaluateTrade, findTrades, lineupSlots, playerValue, positionStrength,
 } from "@/lib/trade";
 import { IconLock, IconSwap, IconUnlock } from "./icons";
 import { HorizonToggle, horizonLabel } from "./Waivers";
@@ -78,7 +78,72 @@ export function DepthNote({ t }: { t: TradeEval }) {
   );
 }
 
-export function TradeCard({ t, partnerName, onAnalyze, note }: { t: TradeEval; partnerName: string; onAnalyze?: () => void; note?: string }) {
+/**
+ * Your best lineup now and after the trade, spot by spot: players leaving are struck through in red, players
+ * arriving are green, and rows that change are highlighted. Bench underneath, then the starting-lineup totals.
+ */
+export function LineupDiff({ t, cfg }: { t: TradeEval; cfg: LeagueConfig }) {
+  const before = lineupSlots(t.rosterBefore, cfg);
+  const after = lineupSlots(t.rosterAfter, cfg);
+  const giveIds = new Set(t.give.map((p) => p.id));
+  const getIds = new Set(t.get.map((p) => p.id));
+  const started = (rows: typeof before) => new Set(rows.flatMap((r) => (r.x ? [r.x.p.id] : [])));
+  const bench = (r: Valued[], s: Set<string>) => r.filter((x) => !s.has(x.p.id)).sort((a, b) => b.v - a.v);
+  const benchB = bench(t.rosterBefore, started(before));
+  const benchA = bench(t.rosterAfter, started(after));
+  const total = (rows: typeof before) => rows.reduce((n, r) => n + (r.x?.v ?? 0), 0);
+  const name = (x: Valued | null, side: "now" | "after") => {
+    if (!x) return <span className="italic text-rose-300/80">empty</span>;
+    const leaving = side === "now" && giveIds.has(x.p.id);
+    const arriving = side === "after" && getIds.has(x.p.id);
+    return (
+      <span className={`flex min-w-0 items-baseline gap-1 ${leaving ? "text-rose-300" : arriving ? "font-semibold text-emerald-300" : "text-slate-200"}`}>
+        <span className={`truncate ${leaving ? "line-through decoration-rose-400/70" : ""}`}>{arriving ? "+ " : ""}{x.p.name}</span>
+        <span className="shrink-0 text-[10px] tabular-nums text-slate-500">{fmt(x.v, 0)}</span>
+      </span>
+    );
+  };
+  const rows = Math.max(benchB.length, benchA.length);
+  return (
+    <div className="mt-2 rounded-lg bg-slate-950/60 p-2.5 text-xs ring-1 ring-slate-800">
+      <div className="grid grid-cols-[2.6rem_minmax(0,1fr)_minmax(0,1fr)] gap-x-2 gap-y-0.5">
+        <span />
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">Now</span>
+        <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">After trade</span>
+        {before.map((r, i) => {
+          const changed = (r.x?.p.id ?? "") !== (after[i]?.x?.p.id ?? "");
+          return (
+            <div key={i} className={`col-span-3 grid grid-cols-subgrid items-baseline rounded-md px-1 py-0.5 ${changed ? "bg-slate-800/50" : ""}`}>
+              <span className="text-[10px] font-bold text-slate-500">{r.slot}</span>
+              {name(r.x, "now")}
+              {name(after[i]?.x ?? null, "after")}
+            </div>
+          );
+        })}
+        <div className="col-span-3 mt-1 grid grid-cols-subgrid border-t border-slate-800 px-1 pt-1 font-semibold">
+          <span className="text-[10px] text-slate-500">Total</span>
+          <span className="tabular-nums text-slate-300">{fmt(total(before), 0)} pts</span>
+          <span className={`tabular-nums ${total(after) >= total(before) ? "text-emerald-300" : "text-rose-300"}`}>{fmt(total(after), 0)} pts</span>
+        </div>
+        {rows > 0 && (
+          <>
+            <span className="col-span-3 mt-2 px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">Bench</span>
+            {Array.from({ length: rows }, (_, i) => (
+              <div key={`b${i}`} className="col-span-3 grid grid-cols-subgrid items-baseline px-1 py-0.5">
+                <span className="text-[10px] text-slate-600">{benchB[i]?.p.pos ?? benchA[i]?.p.pos}</span>
+                {benchB[i] ? name(benchB[i], "now") : <span />}
+                {benchA[i] ? name(benchA[i], "after") : <span />}
+              </div>
+            ))}
+          </>
+        )}
+      </div>
+      <p className="mt-2 px-1 text-[10px] text-slate-500">Numbers are each player&apos;s projected points for the rest of the season. Kickers and defenses aren&apos;t shown.</p>
+    </div>
+  );
+}
+
+export function TradeCard({ t, partnerName, onAnalyze, note, cfg }: { t: TradeEval; partnerName: string; onAnalyze?: () => void; note?: string; cfg?: LeagueConfig }) {
   const a = acceptLabel(t.accept);
   const pct = (x: number, base: number) => `${x >= 0 ? "+" : ""}${((x / Math.max(base, 1)) * 100).toFixed(1)}%`;
   return (
@@ -103,6 +168,15 @@ export function TradeCard({ t, partnerName, onAnalyze, note }: { t: TradeEval; p
       </div>
       {t.reasons.length > 0 && <ul className="mt-2 text-[11px] text-slate-500">{t.reasons.slice(0, 3).map((r) => <li key={r}>• {r}</li>)}</ul>}
       <DepthNote t={t} />
+      {cfg && (
+        <details className="group mt-2">
+          <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-xs font-semibold text-emerald-400 hover:text-emerald-300">
+            See your lineup before → after
+            <span aria-hidden className="inline-block transition-transform duration-300 group-open:rotate-90">›</span>
+          </summary>
+          <LineupDiff t={t} cfg={cfg} />
+        </details>
+      )}
       {note && <p className="mt-2 text-[11px] text-amber-300/90">{note}</p>}
       {onAnalyze && <button onClick={onAnalyze} className="mt-3 text-xs font-semibold text-emerald-400 hover:underline">Tweak in the analyzer →</button>}
     </div>
@@ -249,7 +323,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {suggestions.map((t, i) => (
-              <TradeCard key={i} t={t} partnerName={names.get(t.partnerId) ?? "Team"} onAnalyze={() => openInAnalyzer(t)} />
+              <TradeCard key={i} t={t} cfg={cfg} partnerName={names.get(t.partnerId) ?? "Team"} onAnalyze={() => openInAnalyzer(t)} />
             ))}
           </div>
         )}
@@ -307,7 +381,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
                 custom.theirGain > 0 ? "This helps them more than you." : "This makes both lineups worse."}
               {" "}Values are {horizon === "ros" ? `rest-of-${SOURCE} points (${weeksLeft} weeks left)` : `${horizonLabel(horizon)} points`} for each team&apos;s best starting lineup, plus bench depth (your first backup at each position counts most).
             </p>
-            <div className="sm:col-span-3"><DepthNote t={custom} /></div>
+            <div className="sm:col-span-3"><DepthNote t={custom} /><LineupDiff t={custom} cfg={cfg} /></div>
           </div>
         )}
       </div>

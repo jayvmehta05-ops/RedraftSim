@@ -112,6 +112,9 @@ export interface TradeEval {
   depth: DepthChange[];
   /** plain-English warnings about what the trade leaves you short of */
   warnings: string[];
+  /** your roster before and after, for the side-by-side lineup view (references, not copies) */
+  rosterBefore: Valued[];
+  rosterAfter: Valued[];
 }
 
 export interface DepthChange { pos: Pos; before: number; after: number }
@@ -174,6 +177,8 @@ function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlaye
 export function evaluateTrade(
   mine: Valued[], theirs: Valued[], give: RankedPlayer[], get: RankedPlayer[], cfg: LeagueConfig,
   partnerId: string, lean?: LeaguemateProfile, before?: { mine: number; theirs: number },
+  /** the trade searches skip the depth report while scoring thousands of combinations, then add it to the winners */
+  withDepth = true,
 ): TradeEval {
   const giveIds = new Set(give.map((p) => p.id));
   const getIds = new Set(get.map((p) => p.id));
@@ -201,8 +206,13 @@ export function evaluateTrade(
   if (loved.length) reasons.push(`${lean?.name ?? "They"} loves ${Array.from(new Set(loved)).join("/")}s`);
   if ((lean?.tradeOpenness ?? 0) >= 1) reasons.push(`${lean?.name ?? "They"} trades often`);
   if ((lean?.tradeOpenness ?? 0) <= -1) reasons.push(`${lean?.name ?? "They"} rarely trades, so expect a harder sell`);
-  const { depth, warnings } = depthReport(mine, myNew, cfg);
-  return { partnerId, give, get, myBefore, myAfter, theirBefore, theirAfter, myGain, theirGain, accept, reasons, depth, warnings };
+  const { depth, warnings } = withDepth ? depthReport(mine, myNew, cfg) : { depth: [], warnings: [] };
+  return { partnerId, give, get, myBefore, myAfter, theirBefore, theirAfter, myGain, theirGain, accept, reasons, depth, warnings, rosterBefore: mine, rosterAfter: myNew };
+}
+
+/** Fill in the roster-depth report for a trade scored without it. */
+function withDepthReport(t: TradeEval, cfg: LeagueConfig): TradeEval {
+  return { ...t, ...depthReport(t.rosterBefore, t.rosterAfter, cfg) };
 }
 
 function combos<T>(xs: T[], k: number): T[][] {
@@ -235,7 +245,7 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
     for (const [gk, rk] of [[1, 1], [2, 1], [1, 2], [2, 2]] as const) {
       for (const give of combos(myCands, gk)) {
         for (const get of combos(theirCands, rk)) {
-          const t = evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before);
+          const t = evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false);
           // Must clearly help you, must not meaningfully hurt them, and must be plausible
           if (t.myGain / Math.max(myBefore, 1) < 0.004) continue;
           if (t.theirGain / Math.max(theirBefore, 1) < -0.005 || t.accept < 0.35) continue;
@@ -267,7 +277,8 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
       counts.set(k, (counts.get(k) ?? 0) + 1);
       return (counts.get(k) ?? 0) <= 2;
     })
-    .slice(0, opts.total);
+    .slice(0, opts.total)
+    .map((t) => withDepthReport(t, cfg));
 }
 
 /** Distinct packages, best first: no two results send the same players. */
@@ -302,12 +313,12 @@ export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Par
   for (const get of gets) for (const give of gives) {
     // Don't ask for an extra player of theirs unless you're sending two back
     if (get.length > give.length) continue;
-    all.push(evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before));
+    all.push(evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false));
   }
   const score = (t: TradeEval) => t.accept + 6 * (t.myGain / Math.max(before.mine, 1));
   const realistic = all.filter((t) => t.accept >= 0.4).sort((a, b) => score(b) - score(a));
-  if (realistic.length) return distinctBy(realistic, (t) => ids(t.give), limit);
-  return distinctBy([...all].sort((a, b) => b.accept - a.accept), (t) => ids(t.give), Math.min(2, limit));
+  if (realistic.length) return distinctBy(realistic, (t) => ids(t.give), limit).map((t) => withDepthReport(t, cfg));
+  return distinctBy([...all].sort((a, b) => b.accept - a.accept), (t) => ids(t.give), Math.min(2, limit)).map((t) => withDepthReport(t, cfg));
 }
 
 /** "Shop my player": the best realistic return for `player` from every other team. */
@@ -320,13 +331,13 @@ export function shopPlayer(player: RankedPlayer, mine: Valued[], partners: Partn
     const before = { mine: myBefore, theirs: lineupValue(partner.roster, cfg).total };
     let best: TradeEval | null = null;
     for (const get of [...combos(theirs, 1), ...combos(theirs, 2)]) {
-      const t = evaluateTrade(mine, partner.roster, [player], get, cfg, partner.id, partner.lean, before);
+      const t = evaluateTrade(mine, partner.roster, [player], get, cfg, partner.id, partner.lean, before, false);
       if (t.myGain <= 0 || t.accept < 0.4) continue;
       if (!best || t.myGain * t.accept > best.myGain * best.accept) best = t;
     }
     if (best) out.push(best);
   }
-  return out.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept).slice(0, limit);
+  return out.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept).slice(0, limit).map((t) => withDepthReport(t, cfg));
 }
 
 /** The best lineup laid out slot by slot (QB, RB, RB, …, FLEX, SUPERFLEX); empty slots come back as null. */
