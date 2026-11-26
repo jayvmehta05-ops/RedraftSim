@@ -8,6 +8,7 @@ import { seasonPhase } from "@/lib/phase";
 import { readNav, writeNav } from "@/lib/nav";
 import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
+import Glide from "./Glide";
 import LuckMeter from "./LuckMeter";
 import MyTeam from "./MyTeam";
 import PlayoffOdds from "./PlayoffOdds";
@@ -151,21 +152,22 @@ export default function LeagueHub(props: {
     <div className="space-y-4">
       {/* Tools grouped by what you're trying to do, with a plain description of the open one */}
       {/* Wraps onto more rows on narrow screens so every tool stays visible (no hidden sideways scroll) */}
-      <div className="flex flex-wrap gap-x-2 gap-y-2.5">
+      <Glide pill="rounded-lg bg-emerald-500" className="flex flex-wrap gap-x-2 gap-y-2.5">
         {LEAGUE_GROUPS.map((g) => (
           <div key={g.label} className="max-w-full">
             <div className="mb-1 px-1 text-[10px] font-bold tracking-wider text-slate-500 uppercase">{g.label}</div>
             <div className="flex flex-wrap rounded-xl bg-slate-900 p-1 ring-1 ring-slate-800">
               {g.ids.map((id) => (
-                <button key={id} onClick={() => setSection(id)} title={LEAGUE_HELP[id].what} aria-pressed={section === id}
-                  className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition ${section === id ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>
+                <button key={id} onClick={() => setSection(id)} title={LEAGUE_HELP[id].what} aria-pressed={section === id} data-active={section === id}
+                  className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold ${section === id ? "text-slate-950" : "text-slate-400 hover:text-white"}`}>
                   {LEAGUE_HELP[id].name}
                 </button>
               ))}
             </div>
           </div>
         ))}
-      </div>
+      </Glide>
+      <div key={section} className="ff-view space-y-4">
       <p className="-mt-1 text-sm text-slate-300"><b className="text-white">{LEAGUE_HELP[section].name}:</b> {LEAGUE_HELP[section].what}</p>
       {league && !offseason && (
         <div className="flex items-start gap-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-transparent px-4 py-3 ring-1 ring-emerald-500/20">
@@ -218,6 +220,7 @@ export default function LeagueHub(props: {
       {!offseason && section === "power" && !blocked && league && (
         <PowerRankings board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={weeksLeft} keeper={props.keeper} />
       )}
+      </div>
     </div>
   );
 }

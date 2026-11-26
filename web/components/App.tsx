@@ -9,6 +9,7 @@ import { type ProfileOverride, effectiveProfile } from "@/lib/profiles";
 import { seasonPhase } from "@/lib/phase";
 import { keepRosterEdits, keeperOn } from "@/lib/rosters";
 import AccountButton from "./AccountButton";
+import Glide from "./Glide";
 import BigBoard from "./BigBoard";
 import HelpPanel, { HelpButton } from "./HelpPanel";
 import LeagueEditor from "./LeagueEditor";
@@ -240,8 +241,8 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
   const go = (t: Tab) => {
     setTab(t);
-    writeNav(t);
-    window.scrollTo({ top: 0 });
+    if (t !== tab) writeNav(t); // re-tapping the open tab keeps its tool in the URL
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
   // Browser Back / Forward move between tabs instead of leaving the app
   useEffect(() => {
@@ -263,14 +264,14 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
               Through {m.sourceSeason} Week {m.throughWeek} · updated {updated}<span className="hidden sm:inline"> · refreshes every Tuesday</span>
             </p>
           </div>
-          <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Sections">
+          <Glide as="nav" pill="rounded-lg bg-slate-800" className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Sections">
             {tabs.map((t) => (
-              <button key={t.id} onClick={() => go(t.id)} aria-current={tab === t.id ? "page" : undefined} title={MAIN_HELP[t.id].what}
-                className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+              <button key={t.id} onClick={() => go(t.id)} aria-current={tab === t.id ? "page" : undefined} title={MAIN_HELP[t.id].what} data-active={tab === t.id}
+                className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${tab === t.id ? "text-white" : "text-slate-400 hover:bg-slate-900/70 hover:text-white"}`}>
                 <span className="xl:hidden">{t.mid}</span><span className="hidden xl:inline">{t.label}</span>
               </button>
             ))}
-          </nav>
+          </Glide>
           <div className="ml-auto flex items-center gap-2"><AccountButton /></div>
           <HelpButton onClick={() => setHelpOpen(true)} />
           <div className="lg:hidden"><FeedbackButton inline context={{ tab, league: league ? league.provider : "none" }} /></div>
@@ -289,7 +290,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl px-4 pb-28 pt-5 lg:pb-10">
+      <main key={tab} className="ff-view mx-auto max-w-7xl px-4 pb-28 pt-5 lg:pb-10">
         {tab === "board" && (
           <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} onHelp={() => setHelpOpen(true)} />
         )}
@@ -328,7 +329,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           {tabs.map(({ id, short, icon: Icon }) => (
             <button key={id} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined}
               className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${tab === id ? "text-emerald-400" : "text-slate-500"}`}>
-              <Icon className="h-5 w-5" />
+              <Icon className={`h-5 w-5 transition-transform duration-300 ease-[var(--ease-glide)] ${tab === id ? "scale-110" : ""}`} />
               {short}
             </button>
           ))}

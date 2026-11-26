@@ -1,5 +1,6 @@
 "use client";
 
+import Glide from "./Glide";
 import { useEffect, useState } from "react";
 import type { ImportedLeague, LeagueConfig, Replacement, Toggles } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
@@ -278,17 +279,18 @@ function Seg({ label, hint, value, options: preset, onPick }: {
         <span className="text-sm font-medium text-slate-200">{label}</span>
         <span className="text-[11px] text-slate-500">{hint}</span>
       </div>
-      <div className="grid grid-flow-col gap-1 rounded-lg bg-slate-800/70 p-1">
+      <Glide pill="rounded-md bg-emerald-500" className="grid grid-flow-col gap-1 rounded-lg bg-slate-800/70 p-1">
         {options.map((o) => (
           <button
             key={o.v}
             onClick={() => onPick(o.v)}
-            className={`rounded-md px-3 py-1.5 text-sm transition ${value === o.v ? "bg-emerald-500 font-semibold text-slate-950" : "text-slate-300 hover:bg-slate-700"}`}
+            data-active={value === o.v}
+            className={`rounded-md px-3 py-1.5 text-sm ${value === o.v ? "font-semibold text-slate-950" : "text-slate-300 hover:bg-slate-700/60"}`}
           >
             {o.label}
           </button>
         ))}
-      </div>
+      </Glide>
     </div>
   );
 }
@@ -299,11 +301,11 @@ export default function SettingsDrawer({ open, onClose, toggles, defaults, onCha
   return (
     <>
       <div
-        className={`fixed inset-0 z-40 bg-black/50 transition-opacity ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        className={`fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${open ? "opacity-100" : "pointer-events-none opacity-0"}`}
         onClick={onClose}
       />
       <aside
-        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-slate-800 bg-slate-900 shadow-2xl transition-transform ${open ? "translate-x-0" : "translate-x-full"}`}
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-sm flex-col border-l border-slate-800 bg-slate-900 shadow-2xl transition-transform duration-500 ease-[var(--ease-sheet)] ${open ? "translate-x-0" : "translate-x-full"}`}
         aria-hidden={!open}
       >
         <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">

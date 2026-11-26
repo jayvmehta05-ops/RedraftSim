@@ -26,6 +26,55 @@ body {
   border-radius: 6px;
 }
 
+/* ---------------------------------------------------------------- feel: easing, presses, views, sheets */
+:root {
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);        /* quick start, soft landing */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);      /* panels sliding in and out */
+  --ease-glide: cubic-bezier(0.25, 1.12, 0.4, 1);    /* selection pill, with a hint of spring */
+}
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
+/* Anchored sections land below the sticky header instead of under it */
+[id] { scroll-margin-top: 80px; }
+
+@layer base {
+  /* Every control eases between states (utility classes still win where they set their own) */
+  button, a, input, select, textarea, summary {
+    transition-property: color, background-color, border-color, outline-color, box-shadow, opacity, scale;
+    transition-timing-function: var(--ease-out);
+    transition-duration: 200ms;
+  }
+}
+/* Pressing a button gives it a small squeeze, like a real control */
+button:not(:disabled):active, a[class*="rounded"]:active, summary:active {
+  scale: 0.97;
+  transition-duration: 90ms;
+}
+button { touch-action: manipulation; }
+
+@keyframes ff-view { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: none; } }
+@keyframes ff-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes ff-sheet-right { from { translate: 100% 0; } to { translate: none; } }
+@keyframes ff-pop { from { opacity: 0; translate: 0 16px; scale: 0.97; } to { opacity: 1; translate: none; scale: none; } }
+.ff-view { animation: ff-view 0.38s var(--ease-out) both; }
+.ff-fade { animation: ff-fade 0.25s ease-out both; }
+.ff-sheet-right { animation: ff-sheet-right 0.5s var(--ease-sheet) both; }
+.ff-pop { animation: ff-pop 0.36s var(--ease-out) both; }
+
+/* Selection pill that glides between options (components/Glide.tsx) */
+.ff-glide { position: relative; isolation: isolate; }
+.ff-glide-pill { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; }
+.ff-glide button { position: relative; z-index: 1; }
+
+@media (prefers-reduced-motion: reduce) {
+  button:not(:disabled):active, a[class*="rounded"]:active, summary:active { scale: none; }
+  .ff-glide-pill { transition: none !important; }
+}
+
 /* Hide scrollbars on horizontally scrolling chip rows */
 .no-scrollbar::-webkit-scrollbar {
   display: none;

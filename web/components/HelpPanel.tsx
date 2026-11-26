@@ -47,9 +47,9 @@ export default function HelpPanel({ open, onClose, onGo, hasLeague, hasTeam, kee
   const tabs = (Object.keys(MAIN_HELP) as MainTab[]).filter((t) => t !== "keepers" || keeper);
   const done = [hasLeague, hasTeam, false];
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
+    <div className="ff-fade fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
       <aside role="dialog" aria-modal="true" aria-label="How it works" onClick={(e) => e.stopPropagation()}
-        className="flex h-full w-full max-w-md flex-col bg-slate-950 ring-1 ring-slate-800">
+        className="ff-sheet-right flex h-full w-full max-w-md flex-col bg-slate-950 ring-1 ring-slate-800">
         <div className="flex items-center gap-3 border-b border-slate-800 px-5 py-4">
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-semibold text-white">How it works</h2>

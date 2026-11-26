@@ -209,8 +209,8 @@ export default function LeagueEditor({ open, onClose, board, cfg, league, learne
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
-      <div className="flex h-full w-full max-w-2xl flex-col bg-slate-950 ring-1 ring-slate-800" onClick={(e) => e.stopPropagation()}>
+    <div className="ff-fade fixed inset-0 z-50 flex justify-end bg-black/50" onClick={onClose}>
+      <div className="ff-sheet-right flex h-full w-full max-w-2xl flex-col bg-slate-950 ring-1 ring-slate-800" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b border-slate-800 px-5 py-4">
           <div className="min-w-0 flex-1">
             <h2 className="text-base font-semibold text-white">{league ? `Leaguemates · ${league.name}` : "Set up your league"}</h2>

@@ -62,8 +62,8 @@ export default function FeedbackButton({ context, inline = false }: { context?: 
         </button>
       )}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setOpen(false)}>
-          <div className="w-full max-w-md rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-700" onClick={(e) => e.stopPropagation()}>
+        <div className="ff-fade fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center" onClick={() => setOpen(false)}>
+          <div className="ff-pop w-full max-w-md rounded-2xl bg-slate-900 p-5 ring-1 ring-slate-700" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between">
               <h2 className="text-base font-semibold text-white">Help make this better</h2>
               <button onClick={() => setOpen(false)} className="text-slate-400 hover:text-white" aria-label="Close feedback">✕</button>

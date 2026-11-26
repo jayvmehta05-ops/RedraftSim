@@ -1,5 +1,6 @@
 "use client";
 
+import Glide from "./Glide";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { LeagueConfig, Pos, RankedPlayer } from "@/lib/types";
 import { roundPick } from "@/lib/engine";
@@ -182,14 +183,14 @@ export default function BigBoard({ board, cfg, nonDefault, showEspn = true }: {
   return (
     <section>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <div className="flex max-w-full overflow-x-auto rounded-lg bg-slate-900 p-1 ring-1 ring-slate-800 [scrollbar-width:none]">
+        <Glide pill="rounded-md bg-slate-700" className="flex max-w-full overflow-x-auto rounded-lg bg-slate-900 p-1 ring-1 ring-slate-800 [scrollbar-width:none]">
           {FILTERS.map((f) => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`rounded-md px-3 py-1.5 text-xs font-semibold transition ${filter === f ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"}`}>
+            <button key={f} onClick={() => setFilter(f)} data-active={filter === f}
+              className={`rounded-md px-3 py-1.5 text-xs font-semibold ${filter === f ? "text-white" : "text-slate-400 hover:text-white"}`}>
               {f}
             </button>
           ))}
-        </div>
+        </Glide>
         <input
           value={q}
           onChange={(e) => setQ(e.target.value)}
