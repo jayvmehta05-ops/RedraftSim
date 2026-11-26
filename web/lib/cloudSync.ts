@@ -13,6 +13,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 export const SYNCED_KEYS = [
   "redraft27.savedLeagues", "redraft27.league", "redraft27.myManagers", "redraft27.myManager",
   "redraft27.profiles", "redraft27.toggles", "redraft27.keepers", "redraft27.keeperMode", "redraft.welcomeDismissed",
+  "redraft27.botTuning",
 ];
 const DEVICE_ONLY_ON_SIGNOUT = ["redraft27.espnAuth"];
 const META_KEY = "redraft.syncMeta"; // { key: last cloud updated_at this browser has }

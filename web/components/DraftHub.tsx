@@ -10,6 +10,7 @@ import StrategyLab from "./StrategyLab";
 export default function DraftHub(props: {
   board: RankedPlayer[]; cfg: LeagueConfig; leaguemates: LeaguemateProfile[]; myManager: string | null;
   leagueName: string | null; onOpenEditor: () => void;
+  onTuneLeaguemate?: (managerId: string, issueIds: string[]) => void;
 }) {
   const [mode, setMode] = useState<"mock" | "lab">("mock");
   return (

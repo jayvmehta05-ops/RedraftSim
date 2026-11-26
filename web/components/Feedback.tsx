@@ -108,30 +108,3 @@ export default function FeedbackButton({ context, inline = false }: { context?: 
     </>
   );
 }
-
-/** One-tap realism rating shown when a mock draft finishes. */
-export function MockSurvey({ context }: { context: Record<string, string> }) {
-  const [score, setScore] = useState<number | null>(null);
-  const [note, setNote] = useState("");
-  const [done, setDone] = useState(false);
-  if (done) return <div className="rounded-xl bg-slate-900/60 px-4 py-3 text-sm text-emerald-300 ring-1 ring-slate-800">Thanks, that helps tune the bots.</div>;
-  return (
-    <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900/60 px-4 py-3 ring-1 ring-slate-800">
-      <span className="text-sm text-slate-300">How realistic did the bots draft?</span>
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((n) => (
-          <button key={n} onClick={() => setScore(n)}
-            className={`h-8 w-8 rounded-md text-sm font-semibold ${score === n ? "bg-emerald-500 text-slate-950" : "bg-slate-800 text-slate-300 hover:bg-slate-700"}`}>{n}</button>
-        ))}
-      </div>
-      {score != null && (
-        <>
-          <input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything that felt off? (optional)"
-            className="min-w-0 flex-1 rounded-md bg-slate-800 px-3 py-1.5 text-sm text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
-          <button onClick={() => { sendFeedback({ kind: "mock_realism", score, message: note, context }).catch(() => {}); setDone(true); }}
-            className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950">Send</button>
-        </>
-      )}
-    </div>
-  );
-}

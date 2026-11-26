@@ -11,7 +11,8 @@ import {
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { encodeMock } from "@/lib/share";
 import { draftReplay, pickReaction, simulateAvailability, tierCountdown } from "@/lib/draftSim";
-import { MockSurvey } from "./Feedback";
+import MockSurvey from "./MockSurvey";
+import { type BotTuning, applyBotIssues, describeBotTuning, loadBotTuning, saveBotTuning, tuneBot } from "@/lib/botTuning";
 import { Flags, POS_CELL, PosBadge, TierBadge, fmt } from "./ui";
 import { TARGET, yy } from "@/lib/season";
 
@@ -31,9 +32,11 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return a;
 }
 
-export default function MockDraft({ board, cfg, leaguemates = [], myManager = null, leagueName = null, onOpenEditor }: {
+export default function MockDraft({ board, cfg, leaguemates = [], myManager = null, leagueName = null, onOpenEditor, onTuneLeaguemate }: {
   board: RankedPlayer[]; cfg: LeagueConfig; leaguemates?: LeaguemateProfile[]; myManager?: string | null; leagueName?: string | null;
   onOpenEditor?: () => void;
+  /** end-of-draft feedback about one leaguemate ("takes RBs earlier") edits their profile */
+  onTuneLeaguemate?: (managerId: string, issueIds: string[]) => void;
 }) {
   const teams = cfg.teams;
   // K and D/ST aren't projected: simulate the skill-position rounds and reserve the last rounds for them.
@@ -50,6 +53,11 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
   const [speed, setSpeed] = useState(1);
   const [autoMe, setAutoMe] = useState(false);
   const [useLeague, setUseLeague] = useState(true);
+  // Site-wide bot tuning from past end-of-draft feedback (applied to every bot when a draft starts)
+  const [botTuning, setBotTuning] = useState<BotTuning | null>(null);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { setBotTuning(loadBotTuning()); }, []);
+  const tunedNotes = describeBotTuning(botTuning);
   const [shareMsg, setShareMsg] = useState<string | null>(null);
   const opponents = leaguemates.filter((m) => m.managerId !== myManager);
   const leagueMode = useLeague && opponents.length > 0;
@@ -132,9 +140,9 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
     const rng = mulberry32(seed);
     rngRef.current = rng;
     // Leaguemates first (their real tendencies), topped up with stock personalities if the league is short.
-    const order: BotProfile[] = leagueMode
+    const order: BotProfile[] = (leagueMode
       ? [...shuffle(opponents, rng), ...shuffle(BOT_PROFILES, rng)]
-      : shuffle(BOT_PROFILES, rng);
+      : shuffle(BOT_PROFILES, rng)).map((b) => tuneBot(b, botTuning));
     const b: (BotProfile | null)[] = [];
     let k = 0;
     for (let t = 0; t < teams; t++) b.push(t === startSlot - 1 ? null : order[k++ % order.length]);
@@ -208,6 +216,12 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
                 className={`flex-1 rounded-md px-3 py-1.5 text-xs font-semibold ${!leagueMode ? "bg-slate-600 text-white" : "text-slate-400"}`}>
                 AI personalities
               </button>
+            </div>
+          )}
+          {tunedNotes.length > 0 && (
+            <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md bg-emerald-500/5 px-2.5 py-1.5 text-[11px] text-slate-300 ring-1 ring-emerald-500/20">
+              <span><b className="text-emerald-300">Tuned by your feedback:</b> {tunedNotes.join("; ")}.</span>
+              <button onClick={() => { saveBotTuning(null); setBotTuning(null); }} className="ml-auto rounded px-1.5 py-0.5 font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">Reset</button>
             </div>
           )}
           <div className="mb-1 flex items-center font-semibold text-slate-300">
@@ -336,7 +350,10 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
       )}
 
       {phase === "done" && (
-        <MockSurvey context={{ opponents: locked?.leagueName ? "leaguemates" : "personalities", teams: String(teams), slot: String(userTeam + 1) }} />
+        <MockSurvey context={{ opponents: locked?.leagueName ? "leaguemates" : "personalities", teams: String(teams), slot: String(userTeam + 1) }}
+          mates={bots.flatMap((b) => (b && "managerId" in b ? [{ id: (b as LeaguemateProfile).managerId, name: b.name }] : []))}
+          onTune={(ids) => { const next = applyBotIssues(botTuning, ids); saveBotTuning(next); setBotTuning(next); }}
+          onTuneMate={onTuneLeaguemate} />
       )}
       {phase === "done" && (
         <div className="overflow-x-auto rounded-xl ring-1 ring-slate-800">

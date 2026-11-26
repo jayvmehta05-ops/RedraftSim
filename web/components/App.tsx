@@ -5,7 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from "@/lib/types";
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
 import { buildLeaguemateBots } from "@/lib/leaguemates";
-import { type ProfileOverride, effectiveProfile } from "@/lib/profiles";
+import { type ProfileOverride, effectiveProfile, overrideFromLearned } from "@/lib/profiles";
+import { applyMateIssues } from "@/lib/botTuning";
 import { seasonPhase } from "@/lib/phase";
 import { keepRosterEdits, keeperOn } from "@/lib/rosters";
 import AccountButton from "./AccountButton";
@@ -329,7 +330,8 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} onHelp={() => setHelpOpen(true)} />
         )}
         {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} showEspn={m.publication?.show_espn_fields !== false} />}
-        {tab === "mock" && <DraftHub board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} onOpenEditor={() => setEditorOpen(true)} />}
+        {tab === "mock" && <DraftHub board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} onOpenEditor={() => setEditorOpen(true)}
+          onTuneLeaguemate={(id, ids) => setOverrides({ ...overrides, [id]: applyMateIssues(overrides[id] ?? overrideFromLearned(learned.find((l) => l.managerId === id)), ids) })} />}
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
         {tab === "trades" && (
           <LeagueHub board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
