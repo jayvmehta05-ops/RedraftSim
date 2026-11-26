@@ -1,8 +1,10 @@
 /**
  * Trade assistant engine.
  *
- * A trade is worth what it does to each team's best possible starting lineup (plus a little bench depth),
- * not the raw sum of player values, so 2-for-1 consolidation and positional need are handled naturally.
+ * A trade is worth what it does to each team's best possible starting lineup plus bench depth, not the raw
+ * sum of player values, so 2-for-1 consolidation and positional need are handled naturally. The first healthy
+ * backup at each position you start counts for more than the rest of the bench: he plays whenever a starter
+ * is on bye or hurt, so trading away your only backup RB costs you something real.
  *
  * Horizons:
  *   ros  — rest of the current season (ESPN rest-of-season projection when available, else a blend of this
@@ -17,6 +19,11 @@ import { POSITIONS } from "./types";
 export type Horizon = "ros" | "next" | "both" | "week";
 const BENCH_WEIGHT = 0.15;
 const BENCH_DEPTH = 4;
+/** Rough share of games a starter misses (bye week + injuries), i.e. how often his backup has to play. */
+const MISS: Record<Pos, number> = { QB: 0.08, RB: 0.17, WR: 0.13, TE: 0.12 };
+const UNAVAILABLE = new Set(["IR", "PUP", "Out", "Suspended", "NA"]);
+/** Can this player actually fill in right now (not on IR, out or suspended)? */
+export const isHealthy = (p: RankedPlayer) => !UNAVAILABLE.has(p.injury ?? "");
 
 export function playerValue(p: RankedPlayer, horizon: Horizon, weeksLeft: number): number {
   const next = Math.max(0, p.cur.points);
@@ -44,7 +51,7 @@ export interface Valued {
 }
 
 /** Best starting lineup value for a roster under the league's slots (greedy is optimal for nested flex slots). */
-export function lineupValue(roster: Valued[], cfg: LeagueConfig): { total: number; starters: Valued[]; bench: Valued[] } {
+export function lineupValue(roster: Valued[], cfg: LeagueConfig): { total: number; starters: Valued[]; bench: Valued[]; startersAt: Record<Pos, number> } {
   const byPos: Record<Pos, Valued[]> = { QB: [], RB: [], WR: [], TE: [] };
   for (const x of roster) byPos[x.p.pos]?.push(x);
   for (const pos of POSITIONS) byPos[pos].sort((a, b) => b.v - a.v);
@@ -70,9 +77,23 @@ export function lineupValue(roster: Valued[], cfg: LeagueConfig): { total: numbe
   // Bench depth only matters for positions that can actually step into the lineup. In a 1-QB league a backup QB
   // starts only on bye or injury, so he counts for very little; RB/WR/TE backups also cover the FLEX.
   const benchW = (pos: Pos) => (pos === "QB" && !(cfg.roster.SUPERFLEX ?? 0) ? 0.2 : 1) * BENCH_WEIGHT;
-  const depth = bench.map((x) => x.v * benchW(x.p.pos)).sort((a, b) => b - a).slice(0, BENCH_DEPTH);
-  const total = starters.reduce((s, x) => s + x.v, 0) + depth.reduce((s, v) => s + v, 0);
-  return { total, starters, bench };
+  const startersAt = { QB: 0, RB: 0, WR: 0, TE: 0 } as Record<Pos, number>;
+  for (const x of starters) startersAt[x.p.pos] += 1;
+  // Insurance: your best healthy backup at each position you start plays whenever a starter is on bye or hurt,
+  // so he's worth about (share of games a starter misses) x (how many you start there)
+  const insured = new Set<string>();
+  let insurance = 0;
+  for (const pos of POSITIONS) {
+    if (!startersAt[pos]) continue;
+    const backup = bench.find((x) => x.p.pos === pos && isHealthy(x.p));
+    if (!backup) continue;
+    insurance += backup.v * Math.max(benchW(pos), Math.min(0.5, MISS[pos] * startersAt[pos]));
+    insured.add(backup.p.id);
+  }
+  const depth = bench.filter((x) => !insured.has(x.p.id)).map((x) => x.v * benchW(x.p.pos))
+    .sort((a, b) => b - a).slice(0, Math.max(0, BENCH_DEPTH - insured.size));
+  const total = starters.reduce((s, x) => s + x.v, 0) + insurance + depth.reduce((s, v) => s + v, 0);
+  return { total, starters, bench, startersAt };
 }
 
 export interface TradeEval {
@@ -87,6 +108,49 @@ export interface TradeEval {
   theirGain: number;
   accept: number; // 0..1 estimated chance the other manager says yes
   reasons: string[];
+  /** your healthy players at each position whose count changes, before -> after */
+  depth: DepthChange[];
+  /** plain-English warnings about what the trade leaves you short of */
+  warnings: string[];
+}
+
+export interface DepthChange { pos: Pos; before: number; after: number }
+
+/**
+ * What a trade does to your roster's shape: healthy players per position before and after, and a warning
+ * when it leaves a starting spot you can't fill or takes away your last backup at a position.
+ */
+export function depthReport(before: Valued[], after: Valued[], cfg: LeagueConfig): { depth: DepthChange[]; warnings: string[] } {
+  const count = (r: Valued[]) => {
+    const c = { QB: 0, RB: 0, WR: 0, TE: 0 } as Record<Pos, number>;
+    for (const x of r) if (isHealthy(x.p)) c[x.p.pos] += 1;
+    return c;
+  };
+  const b = count(before), a = count(after);
+  const lb = lineupValue(before, cfg), la = lineupValue(after, cfg);
+  // Can someone step in when one of your starters at `pos` misses a week? Either a spare at that position, or,
+  // when one of them plays FLEX, he slides into the position's spot and a healthy bench RB/WR/TE takes the FLEX.
+  const covered = (c: Record<Pos, number>, l: ReturnType<typeof lineupValue>, pos: Pos) => {
+    const slots = cfg.roster[pos] ?? 0;
+    if (c[pos] <= slots) return false;
+    if (c[pos] > l.startersAt[pos]) return true;
+    return cfg.flex_eligible.includes(pos) && l.bench.some((x) => cfg.flex_eligible.includes(x.p.pos) && isHealthy(x.p));
+  };
+  const depth: DepthChange[] = [];
+  const warnings: string[] = [];
+  const plural = (n: number, pos: Pos) => `${n} healthy ${pos}${n === 1 ? "" : "s"}`;
+  for (const pos of POSITIONS) {
+    if (a[pos] === b[pos]) continue;
+    depth.push({ pos, before: b[pos], after: a[pos] });
+    if (a[pos] >= b[pos]) continue;
+    const slots = cfg.roster[pos] ?? 0;
+    if (a[pos] < slots) {
+      warnings.push(`Leaves an empty ${pos} spot: ${plural(a[pos], pos)} for ${slots} starting ${slots === 1 ? "spot" : "spots"}`);
+    } else if (slots > 0 && covered(b, lb, pos) && !covered(a, la, pos)) {
+      warnings.push(`No backup ${pos} left (${plural(a[pos], pos)}): a bye or injury means grabbing someone off waivers`);
+    }
+  }
+  return { depth, warnings };
 }
 
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
@@ -137,7 +201,8 @@ export function evaluateTrade(
   if (loved.length) reasons.push(`${lean?.name ?? "They"} loves ${Array.from(new Set(loved)).join("/")}s`);
   if ((lean?.tradeOpenness ?? 0) >= 1) reasons.push(`${lean?.name ?? "They"} trades often`);
   if ((lean?.tradeOpenness ?? 0) <= -1) reasons.push(`${lean?.name ?? "They"} rarely trades, so expect a harder sell`);
-  return { partnerId, give, get, myBefore, myAfter, theirBefore, theirAfter, myGain, theirGain, accept, reasons };
+  const { depth, warnings } = depthReport(mine, myNew, cfg);
+  return { partnerId, give, get, myBefore, myAfter, theirBefore, theirAfter, myGain, theirGain, accept, reasons, depth, warnings };
 }
 
 function combos<T>(xs: T[], k: number): T[][] {

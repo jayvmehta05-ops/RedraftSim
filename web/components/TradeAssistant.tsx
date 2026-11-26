@@ -57,6 +57,27 @@ function Players({ ps }: { ps: RankedPlayer[] }) {
   );
 }
 
+/** Your healthy players per position, before -> after, plus warnings when the trade leaves you short. */
+export function DepthNote({ t }: { t: TradeEval }) {
+  if (!t.depth.length && !t.warnings.length) return null;
+  const warned = new Set(t.warnings.map((w) => w.match(/\b(QB|RB|WR|TE)\b/)?.[1]));
+  return (
+    <div className="mt-2 space-y-1">
+      {t.depth.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px]" title="Healthy players you'd have at each position, before → after">
+          <span className="text-slate-500">Your roster:</span>
+          {t.depth.map((d) => (
+            <span key={d.pos} className={`rounded-md px-1.5 py-0.5 tabular-nums ring-1 ${warned.has(d.pos) ? "bg-amber-500/10 text-amber-200 ring-amber-500/30" : "bg-slate-800/60 text-slate-300 ring-slate-700/60"}`}>
+              {d.pos} {d.before} → {d.after}
+            </span>
+          ))}
+        </div>
+      )}
+      {t.warnings.map((w) => <p key={w} className="text-[11px] text-amber-300/90">⚠ {w}</p>)}
+    </div>
+  );
+}
+
 export function TradeCard({ t, partnerName, onAnalyze, note }: { t: TradeEval; partnerName: string; onAnalyze?: () => void; note?: string }) {
   const a = acceptLabel(t.accept);
   const pct = (x: number, base: number) => `${x >= 0 ? "+" : ""}${((x / Math.max(base, 1)) * 100).toFixed(1)}%`;
@@ -81,6 +102,7 @@ export function TradeCard({ t, partnerName, onAnalyze, note }: { t: TradeEval; p
         <span className="text-slate-400">Theirs <b className={t.theirGain >= 0 ? "text-emerald-300" : "text-rose-300"}>{t.theirGain >= 0 ? "+" : ""}{fmt(t.theirGain, 0)} pts</b></span>
       </div>
       {t.reasons.length > 0 && <ul className="mt-2 text-[11px] text-slate-500">{t.reasons.slice(0, 3).map((r) => <li key={r}>• {r}</li>)}</ul>}
+      <DepthNote t={t} />
       {note && <p className="mt-2 text-[11px] text-amber-300/90">{note}</p>}
       {onAnalyze && <button onClick={onAnalyze} className="mt-3 text-xs font-semibold text-emerald-400 hover:underline">Tweak in the analyzer →</button>}
     </div>
@@ -283,8 +305,9 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
               {custom.myGain > 0 && custom.theirGain > 0 ? "Win-win: both starting lineups improve." :
                 custom.myGain > 0 ? "Good for you, worse for them: expect pushback or a counter." :
                 custom.theirGain > 0 ? "This helps them more than you." : "This makes both lineups worse."}
-              {" "}Values are {horizon === "ros" ? `rest-of-${SOURCE} points (${weeksLeft} weeks left)` : `${horizonLabel(horizon)} points`} for each team&apos;s best starting lineup, plus a little bench depth.
+              {" "}Values are {horizon === "ros" ? `rest-of-${SOURCE} points (${weeksLeft} weeks left)` : `${horizonLabel(horizon)} points`} for each team&apos;s best starting lineup, plus bench depth (your first backup at each position counts most).
             </p>
+            <div className="sm:col-span-3"><DepthNote t={custom} /></div>
           </div>
         )}
       </div>
