@@ -10,6 +10,8 @@ import type { ImportedLeague, LeagueConfig, Pos, RankedPlayer } from "@/lib/type
 import { POSITIONS } from "@/lib/types";
 import { IconLock, IconUnlock } from "./icons";
 import { TradeCard, tradeKey } from "./TradeAssistant";
+import { LoanControls } from "./Loans";
+import { afterLoans } from "@/lib/loans";
 import { type LivePlayer, livePoints, useLiveWeek } from "@/lib/live";
 import { statusLabel } from "@/lib/weekly";
 import { applyTradeRating, reportTradeRating } from "./RateTrade";
@@ -25,10 +27,12 @@ type TradeEval = BaseTrade & { partnerName?: string };
 /** Rest-of-season points per game: ESPN's projection when available, else this season's average. */
 const rosPpg = (p: RankedPlayer) => p.cur.espnRosPpg ?? (p.g26 > 0 ? p.cur.ppg26 : null);
 
-function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked, live }: {
+function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked, live, loanTag }: {
   slot?: string; x: Valued | null; dim?: boolean; selected?: boolean; onClick?: () => void; rosRank?: number; keeper?: boolean; locked?: boolean;
   /** this week's live points and game status (undefined until live scores load) */
   live?: LivePlayer;
+  /** "YOURS · LOAN" / "LOAN from Team 5" when he's on a 1-week trade */
+  loanTag?: string;
 }) {
   if (!x) {
     return (
@@ -58,6 +62,7 @@ function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked, l
             <span className={`truncate font-semibold ${dim ? "text-slate-300" : "text-white"}`}>{p.name}</span>
             {hurt && <span className="shrink-0 rounded bg-red-500/20 px-1 text-[10px] font-bold text-red-300" title={[p.injury, p.injuryPart].filter(Boolean).join(": ")}>{statusLabel(p.injury)}</span>}
             {locked && <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 text-[10px] font-bold text-amber-300" title="Can't be traded right now"><IconLock className="h-2.5 w-2.5" />LOCKED</span>}
+            {loanTag && <span className="shrink-0 rounded bg-sky-500/15 px-1 text-[10px] font-bold whitespace-nowrap text-sky-300" title="On a 1-week trade: trade ideas count him on his owner's team">{loanTag}</span>}
             <Flags flags={p.flags.filter((f) => f !== "rookie")} notes={p.notes} />
           </div>
           <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
@@ -100,7 +105,9 @@ function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked, l
 }
 
 /** Actions for a clicked player: trade for them (or a 1-week trade), or shop your own player. */
-function PlayerActions({ onRate, cfg, player, owner, isMine, weekTrades, weeksLeft, onOpenEditor, ideas, isLocked, onToggleLock, tradesOpen }: {
+function PlayerActions({ loanControls, onRate, cfg, player, owner, isMine, weekTrades, weeksLeft, onOpenEditor, ideas, isLocked, onToggleLock, tradesOpen }: {
+  /** "He's mine (1-week loan)" / "On loan from…" (leagues with 1-week trades) */
+  loanControls?: React.ReactNode;
   onRate: (t: TradeEval, r: Rating) => void; cfg: LeagueConfig; player: RankedPlayer; owner: LeagueTeam; isMine: boolean; weekTrades: boolean; weeksLeft: number; onOpenEditor: () => void;
   ideas: (mode: Mode) => TradeEval[]; isLocked: boolean; onToggleLock: () => void; tradesOpen: boolean;
 }) {
@@ -136,6 +143,7 @@ function PlayerActions({ onRate, cfg, player, owner, isMine, weekTrades, weeksLe
           title="For players on a 1-week trade or otherwise not tradeable">
           {isLocked ? <><IconUnlock className="h-3.5 w-3.5" /> Unlock</> : <><IconLock className="h-3.5 w-3.5" /> Can&apos;t be traded</>}
         </button>}
+        {loanControls}
         {tradesOpen && !isMine && !isLocked && !weekTrades && weeksLeft > 0 && (
           <button onClick={onOpenEditor} className="self-center text-[11px] text-slate-500 hover:text-slate-300">League allows 1-week trades? Turn it on →</button>
         )}
@@ -162,7 +170,9 @@ function PlayerActions({ onRate, cfg, player, owner, isMine, weekTrades, weeksLe
 }
 
 /** Rosters: any team's best lineup and bench. Click a player to trade for them, or to shop your own. */
-export default function MyTeam({ board, cfg, league, myManager, leaguemates, weeksLeft, tradesOpen, keeper, onGo, onOpenEditor, onLeagueEdit }: {
+export default function MyTeam({ board, cfg, league, myManager, leaguemates, weeksLeft, tradesOpen, keeper, onGo, onOpenEditor, onLeagueEdit, week }: {
+  /** current NFL week (for 1-week loans) */
+  week: number;
   board: RankedPlayer[]; cfg: LeagueConfig; league: ImportedLeague; myManager: string; leaguemates: LeaguemateProfile[];
   weeksLeft: number; tradesOpen: boolean; keeper: boolean; onGo: (section: "trades" | "waivers" | "power") => void; onOpenEditor: () => void;
   onLeagueEdit: (l: ImportedLeague) => void;
@@ -173,6 +183,9 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
   const [selected, setSelected] = useState<string | null>(null);
   const { teams } = useLeagueTeams(board, league, horizon, weeksLeft);
   const { teams: weekTeams } = useLeagueTeams(board, league, "week", weeksLeft);
+  // Rosters as they'll be once 1-week loans end (trade ideas); 1-week trades use this week's rosters
+  const loans = league.rules?.loans;
+  const tradeTeams = useMemo(() => afterLoans(teams, loans), [teams, loans]);
   const leans = useMemo(() => new Map(leaguemates.map((l) => [l.managerId, l])), [leaguemates]);
   const locked = useMemo(() => lockedSet(league), [league]);
   // Rest-of-season rank at each position across the whole board
@@ -186,6 +199,16 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
   const me = teams.find((t) => t.id === myManager);
   const viewing = teams.find((t) => t.id === teamId) ?? me;
   const isMine = viewing?.id === myManager;
+  // "YOURS · LOAN" / "LOAN from Team 5" tags for players on a 1-week trade, for the team being viewed
+  const viewingId = viewing?.id;
+  const loanTags = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const l of loans ?? []) {
+      if (l.holder !== viewingId) continue;
+      m.set(l.playerId, l.owner === myManager ? "YOURS · LOAN" : `LOAN from ${league.managers.find((x) => x.id === l.owner)?.name ?? "another team"}`);
+    }
+    return m;
+  }, [loans, viewingId, myManager, league.managers]);
   // This week's live points (refreshes every minute while games are on)
   const liveWeek = useLiveWeek(tradesOpen || weeksLeft > 0);
   const liveFor = (p: RankedPlayer) => (liveWeek ? livePoints(p, liveWeek, cfg) : undefined);
@@ -209,7 +232,7 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
   // Trade ideas for the clicked player, computed on demand
   const ideas = useMemo(() => {
     return (mode: Mode, player: RankedPlayer): TradeEval[] => {
-      const pool = mode === "week" ? weekTeams : teams;
+      const pool = mode === "week" ? weekTeams : tradeTeams;
       const mine = pool.find((t) => t.id === myManager);
       if (!mine || !viewing) return [];
       const asPartner = (t: LeagueTeam): Partner => ({ id: t.id, name: t.name, roster: t.roster, lean: leans.get(t.id) });
@@ -221,7 +244,7 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
       const owner = pool.find((t) => t.id === viewing.id);
       return owner ? findTradesFor(player, mine.roster, asPartner(owner), cfg, 4, locked, league.rules?.tradeTuning) : [];
     };
-  }, [teams, weekTeams, myManager, viewing, leans, cfg, locked, league.rules?.tradeTuning]);
+  }, [tradeTeams, weekTeams, myManager, viewing, leans, cfg, locked, league.rules?.tradeTuning]);
 
   if (!me || !viewing || !view) return null;
 
@@ -253,9 +276,11 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
     <div key={key ?? x?.p.id ?? slot}>
       <PlayerRow slot={slot} x={x} dim={dim} selected={!!x && selected === x.p.id} rosRank={x ? rosRanks.get(x.p.id) : undefined} keeper={keeper} locked={!!x && locked.has(x.p.id)}
         live={x ? liveFor(x.p) : undefined}
+        loanTag={x ? loanTags.get(x.p.id) : undefined}
         onClick={x ? () => setSelected(selected === x.p.id ? null : x.p.id) : undefined} />
       {x && selected === x.p.id && (
         <PlayerActions key={`${viewing.id}-${x.p.id}`} cfg={cfg} player={x.p}
+          loanControls={league.rules?.weekTrades && myManager ? <LoanControls player={x.p} holderId={viewing.id} myManager={myManager} league={league} week={week} onLeagueEdit={onLeagueEdit} /> : undefined}
           onRate={(t, r) => { onLeagueEdit(applyTradeRating(league, t, r)); reportTradeRating(t, r, league.provider); }} owner={viewing} isMine={isMine}
           weekTrades={!!league.rules?.weekTrades} weeksLeft={weeksLeft} onOpenEditor={onOpenEditor}
           isLocked={locked.has(x.p.id)} onToggleLock={() => onLeagueEdit(toggleLock(league, x.p.id))} tradesOpen={tradesOpen}

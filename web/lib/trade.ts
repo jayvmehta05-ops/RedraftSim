@@ -172,9 +172,17 @@ function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlaye
     for (const p of give) taste += (early[p.pos] ?? 0) / 8;
     for (const p of get) taste -= (early[p.pos] ?? 0) / 8;
   }
+  // What you've told us about how they trade: positions they want or want to move
+  const wants = lean?.tradeWants ?? {};
+  for (const p of give) taste += (wants[p.pos] ?? 0) / 1.5;
+  for (const p of get) taste -= (wants[p.pos] ?? 0) / 2.5;
+  // Consolidators like getting fewer, better players; depth-seekers like more bodies back
+  const pkg = (lean?.packages ?? 0) * Math.sign(get.length - give.length) * 0.5;
+  // Someone who "needs to win" wants about +1% to their lineup per point before it feels like a yes
+  const need = 0.008 * (lean?.tradeWin ?? 0);
   // Lineup impact dominates; name value (ADP) and positional taste nudge it
-  return sigmoid(-0.3 + 45 * theirGainPct + 0.25 * Math.max(-3, Math.min(3, perceived)) + 0.5 * taste
-    + 0.6 * (lean?.tradeOpenness ?? 0) - 0.6 * penalty);
+  return sigmoid(-0.3 + 45 * (theirGainPct - need) + 0.25 * (lean?.nameValue ?? 1) * Math.max(-3, Math.min(3, perceived)) + 0.5 * taste
+    + pkg + 0.6 * (lean?.tradeOpenness ?? 0) - 0.6 * penalty);
 }
 
 export function evaluateTrade(
@@ -202,7 +210,7 @@ export function evaluateTrade(
   const reasons: string[] = [];
   const posList = (ps: RankedPlayer[]) => Array.from(new Set(ps.map((p) => p.pos))).join("/");
   if (give.length > get.length) reasons.push(`Consolidates ${give.length}-for-${get.length} into a better starter`);
-  if (get.length > give.length) reasons.push(`Adds depth: ${get.length} players for ${give.length}`);
+  if (get.length > give.length) reasons.push(`Adds depth: ${get.length} players for ${give.length} (you'll need to drop ${get.length - give.length} to make room)`);
   const newStarters = get.filter((p) => myLineupAfter.starters.some((x) => x.p.id === p.id));
   if (myGain > 0 && newStarters.length) reasons.push(`Upgrades your ${posList(newStarters)} starting spot`);
   else if (myGain > 0) reasons.push("Adds bench depth");
@@ -210,6 +218,9 @@ export function evaluateTrade(
   const early = lean?.posBiasByPhase?.early;
   const loved = give.filter((p) => (early?.[p.pos] ?? 0) >= 2).map((p) => p.pos);
   if (loved.length) reasons.push(`${lean?.name ?? "They"} loves ${Array.from(new Set(loved)).join("/")}s`);
+  const wanted = give.filter((p) => (lean?.tradeWants?.[p.pos] ?? 0) > 0).map((p) => p.pos);
+  if (wanted.length) reasons.push(`${lean?.name ?? "They"} is looking for a ${Array.from(new Set(wanted)).join("/")}`);
+  if ((lean?.tradeWin ?? 0) >= 1 && theirGain <= 0) reasons.push(`${lean?.name ?? "They"} likes to win trades, so expect a counter`);
   if ((lean?.tradeOpenness ?? 0) >= 1) reasons.push(`${lean?.name ?? "They"} trades often`);
   if ((lean?.tradeOpenness ?? 0) <= -1) reasons.push(`${lean?.name ?? "They"} rarely trades, so expect a harder sell`);
   const { depth, warnings } = withDepth ? depthReport(mine, myNew, cfg) : { depth: [], warnings: [] };
@@ -221,10 +232,56 @@ function withDepthReport(t: TradeEval, cfg: LeagueConfig): TradeEval {
   return { ...t, ...depthReport(t.rosterBefore, t.rosterAfter, cfg) };
 }
 
-function combos<T>(xs: T[], k: number): T[][] {
-  if (k === 1) return xs.map((x) => [x]);
+function combos<T>(xs: T[], k: number, from = 0): T[][] {
+  if (k === 0) return [[]];
   const out: T[][] = [];
-  for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) out.push([xs[i], xs[j]]);
+  for (let i = from; i <= xs.length - k; i++) for (const rest of combos(xs, k - 1, i + 1)) out.push([xs[i], ...rest]);
+  return out;
+}
+
+/** Biggest package either side may send (4-for-3, 3-for-4 and so on). */
+const MAX_SIDE = 4;
+/** A bigger trade must beat the smaller one it grew from by this much (score = your gain × chance of a yes). */
+const GROW_MARGIN = 1.12;
+
+/**
+ * Grow promising trades into bigger ones: add one player on your side, theirs, or both, and keep a version only
+ * when it's clearly better than the trade it grew from. Two rounds, so a 2-for-2 can become 3-for-3 and then 4-for-3.
+ * Much cheaper than trying every 3- and 4-player combination, and it only surfaces big trades with a real edge.
+ */
+function growTrades(
+  seeds: TradeEval[], myPool: RankedPlayer[], theirPool: RankedPlayer[], grow: (give: RankedPlayer[], get: RankedPlayer[]) => TradeEval,
+  rounds = 2, beam = 4,
+): TradeEval[] {
+  const score = (t: TradeEval) => Math.max(0, t.myGain) * t.accept;
+  const seen = new Set<string>();
+  const key = (g: RankedPlayer[], r: RankedPlayer[]) => `${g.map((p) => p.id).sort().join(",")}>${r.map((p) => p.id).sort().join(",")}`;
+  const out: TradeEval[] = [];
+  let frontier = seeds;
+  for (let round = 0; round < rounds && frontier.length; round++) {
+    const next: TradeEval[] = [];
+    for (const seed of frontier.slice(0, beam)) {
+      const giveIds = new Set(seed.give.map((p) => p.id));
+      const getIds = new Set(seed.get.map((p) => p.id));
+      const addMine = seed.give.length < MAX_SIDE ? myPool.filter((p) => !giveIds.has(p.id)).slice(0, 5) : [];
+      const addTheirs = seed.get.length < MAX_SIDE ? theirPool.filter((p) => !getIds.has(p.id)).slice(0, 5) : [];
+      const variants: [RankedPlayer[], RankedPlayer[]][] = [
+        ...addMine.map((p): [RankedPlayer[], RankedPlayer[]] => [[...seed.give, p], seed.get]),
+        ...addTheirs.map((p): [RankedPlayer[], RankedPlayer[]] => [seed.give, [...seed.get, p]]),
+        ...addMine.flatMap((a) => addTheirs.map((b): [RankedPlayer[], RankedPlayer[]] => [[...seed.give, a], [...seed.get, b]])),
+      ];
+      for (const [give, get] of variants) {
+        const k = key(give, get);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        const t = grow(give, get);
+        if (score(t) >= score(seed) * GROW_MARGIN && t.myGain > seed.myGain * 0.9) next.push(t);
+      }
+    }
+    next.sort((a, b) => score(b) - score(a));
+    out.push(...next);
+    frontier = next;
+  }
   return out;
 }
 
@@ -250,17 +307,24 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
     const theirBefore = lineupValue(partner.roster, cfg).total;
     const before = { mine: myBefore, theirs: theirBefore };
     const found: TradeEval[] = [];
+    const seeds: TradeEval[] = [];
+    const ok = (t: TradeEval) =>
+      // Must clearly help you, must not meaningfully hurt them, and must be plausible
+      t.myGain / Math.max(myBefore, 1) >= minGain && t.theirGain / Math.max(theirBefore, 1) >= -0.005 && t.accept >= minAccept;
+    const evalT = (give: RankedPlayer[], get: RankedPlayer[]) =>
+      evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false, tuning);
     for (const [gk, rk] of [[1, 1], [2, 1], [1, 2], [2, 2]] as const) {
       for (const give of combos(myCands, gk)) {
         for (const get of combos(theirCands, rk)) {
-          const t = evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false, tuning);
-          // Must clearly help you, must not meaningfully hurt them, and must be plausible
-          if (t.myGain / Math.max(myBefore, 1) < minGain) continue;
-          if (t.theirGain / Math.max(theirBefore, 1) < -0.005 || t.accept < minAccept) continue;
-          found.push(t);
+          const t = evalT(give, get);
+          if (t.myGain > 0) seeds.push(t); // promising even if they'd say no yet: a sweetener can fix that
+          if (ok(t)) found.push(t);
         }
       }
     }
+    // Bigger deals (3-for-2, 3-for-3, up to 4 a side) when adding players makes a trade clearly better
+    seeds.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept);
+    for (const t of growTrades(seeds, top(mine, 10), top(partner.roster, 10), evalT)) if (ok(t)) found.push(t);
     found.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept);
     // Keep distinct ideas: don't repeat the same players going out or coming back
     const seenGive = new Set<string>();
@@ -270,6 +334,9 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
       const gKey = t.give.map((p) => p.id).sort().join(",");
       const rKey = t.get.map((p) => p.id).sort().join(",");
       if (seenGive.has(gKey) || seenGet.has(rKey)) continue;
+      // Skip near-copies: a second idea with this team that shares most of its players with one already kept
+      const overlap = (a: RankedPlayer[], b: RankedPlayer[]) => a.filter((p) => b.some((q) => q.id === p.id)).length;
+      if (out.slice(out.length - kept).some((k) => overlap(k.give, t.give) + overlap(k.get, t.get) >= Math.max(2, t.give.length + t.get.length - 2))) continue;
       // You asked not to see trades that leave you short at a position
       if (tuning?.hideThin && depthReport(t.rosterBefore, t.rosterAfter, cfg).warnings.length) continue;
       seenGive.add(gKey);
@@ -317,7 +384,7 @@ export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Par
   const myCands = top(mine, 10);
   const extras = top(partner.roster.filter((x) => x.p.id !== target.id), 6);
   const gets: RankedPlayer[][] = [[target], ...extras.map((p) => [target, p])];
-  const gives = [...combos(myCands, 1), ...combos(myCands, 2)];
+  const gives = [...combos(myCands, 1), ...combos(myCands, 2), ...combos(myCands.slice(0, 8), 3)];
   const before = { mine: lineupValue(mine, cfg, tuning?.depthBoost ?? 1).total, theirs: lineupValue(partner.roster, cfg).total };
   const all: TradeEval[] = [];
   for (const get of gets) for (const give of gives) {

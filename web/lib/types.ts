@@ -208,6 +208,10 @@ export interface ImportedLeague {
     locked?: string[];
     /** how your trade ratings have tuned the trade assistant for this league (lib/tradeTuning.ts) */
     tradeTuning?: TradeTuning;
+    /** 1-week trades in effect (lib/loans.ts) */
+    loans?: Loan[];
+    /** swaps noticed on a roster refresh, waiting for you to say whether they were 1-week trades */
+    pendingTrades?: PendingTrade[];
   };
   /** league format as the platform reports it */
   kind?: "redraft" | "keeper" | "dynasty";
@@ -238,4 +242,24 @@ export interface TradeTuning {
   /** managerId -> how much harder a sell they are than their profile says */
   partnerPenalty?: Record<string, number>;
   votes?: { up: number; down: number };
+}
+
+/** A player on a 1-week trade: he belongs to `owner` but is on `holder`'s roster until the loan ends. */
+export interface Loan {
+  /** board player id */
+  playerId: string;
+  /** the platform's id for him (Sleeper or ESPN), when known, so the loan clears once he's back */
+  pid?: string;
+  owner: string;
+  holder: string;
+  /** NFL week the loan was for */
+  week: number;
+}
+
+/** A swap between you and `partner` seen on a refresh; ids are your league platform's player ids. */
+export interface PendingTrade {
+  partner: string;
+  sent: string[];
+  got: string[];
+  week: number;
 }

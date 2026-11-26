@@ -9,6 +9,7 @@ import { type ProfileOverride, effectiveProfile, overrideFromLearned } from "@/l
 import { applyMateIssues } from "@/lib/botTuning";
 import { seasonPhase } from "@/lib/phase";
 import { keepRosterEdits, keeperOn } from "@/lib/rosters";
+import { activeLoans, detectSwaps } from "@/lib/loans";
 import AccountButton from "./AccountButton";
 import Glide from "./Glide";
 import { type SwipeTarget, useSwipePages } from "./useSwipePages";
@@ -170,7 +171,19 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   };
   // Re-imported league (e.g. refreshed rosters): keep the chosen team and current toggles
   const refreshLeague = (lg: ImportedLeague) => {
-    const merged = keepRosterEdits(league, lg);
+    let merged = keepRosterEdits(league, lg);
+    // 1-week trades: drop loans that have ended, and notice new swaps with another team so you can tag them
+    const week = data.meta.throughWeek + 1;
+    const loans = activeLoans(merged, week);
+    let pendingTrades = merged.rules?.pendingTrades ?? [];
+    if (merged.rules?.weekTrades && myManager) {
+      const known = new Set(pendingTrades.map((p) => `${p.partner}:${[...p.sent, ...p.got].sort().join(",")}`));
+      for (const s of detectSwaps(league, merged, myManager, week)) {
+        const k = `${s.partner}:${[...s.sent, ...s.got].sort().join(",")}`;
+        if (!known.has(k)) pendingTrades = [...pendingTrades, s];
+      }
+    }
+    merged = { ...merged, rules: { ...merged.rules, loans, pendingTrades } };
     setLeague(merged);
     save(LEAGUE_KEY, merged);
     storeSaved({ ...savedLeagues, [leagueKey(merged)]: merged });

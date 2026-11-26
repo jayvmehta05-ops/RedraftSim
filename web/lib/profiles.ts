@@ -16,6 +16,12 @@ export interface ProfileOverride {
   runSensitivity: number;  // 0 .. 2.5
   tradeOpenness: number;   // -2 (never trades) .. +2 (trades anything)
   note: string;            // the user's own description, kept for reference
+  // How they trade (optional, so older saved profiles still load)
+  tradeWin?: number;       // -2 (fair deals are fine) .. +2 (must clearly win)
+  nameValue?: number;      // 0 (lineup points only) .. 2 (big names sell); 1 = typical
+  tradeWants?: Partial<Record<Pos, number>>; // + looking for that position, - trying to move it
+  packages?: number;       // -1 wants depth back .. +1 likes 2-for-1 consolidation
+  tradeNote?: string;      // the user's own description of how they trade
 }
 
 const zero = (): Record<Pos, number> => ({ QB: 0, RB: 0, WR: 0, TE: 0 });
@@ -89,6 +95,50 @@ const RULES: { re: RegExp; label: string; apply: (o: ProfileOverride) => void }[
   { re: /trades? (a lot|often|anything|everything)|loves? trad|active trader|easy to trade|trade happy|always trading/, label: "trades often", apply: (o) => { o.tradeOpenness = 2; } },
 ];
 
+/** Plain-English description of how someone trades -> trade settings. Matched rules are shown to the user. */
+const TRADE_RULES: { re: RegExp; label: string; apply: (o: ProfileOverride) => void }[] = [
+  { re: /never trades?|won'?t trade|hates? trad|doesn'?t trade|inactive|hard to trade|stubborn/, label: "rarely trades", apply: (o) => { o.tradeOpenness = -2; } },
+  { re: /trades? (a lot|often|anything|everything|constantly)|loves? trad|active trader|easy to trade|trade[\s-]happy|always trading/, label: "trades often", apply: (o) => { o.tradeOpenness = 2; } },
+  { re: /fleece|lopsided|has to win|needs? to win|wants? to win|hard bargain|lowball|rip(s)? (you|people) off|shark/, label: "needs to win the trade", apply: (o) => { o.tradeWin = 2; } },
+  { re: /\bfair\b|reasonable|win[\s-]win|easy going|easygoing|generous|nice guy/, label: "takes fair deals", apply: (o) => { o.tradeWin = -1; } },
+  { re: /big names?|stars?|name value|brand|loves? (big|famous)|adp|draft (spot|position|capital)/, label: "sold on big names", apply: (o) => { o.nameValue = 2; } },
+  { re: /only cares about (the )?(lineup|points|stats|numbers)|analytics|spreadsheet|by the numbers|sharp/, label: "only cares about lineup points", apply: (o) => { o.nameValue = 0.3; } },
+  { re: /2[\s-]?for[\s-]?1|two[\s-]for[\s-]one|consolidat|package|quality over quantity/, label: "likes consolidating (2-for-1s)", apply: (o) => { o.packages = 1; } },
+  { re: /\bdepth\b|quantity|more players|bodies/, label: "wants depth back", apply: (o) => { o.packages = -1; } },
+  ...(["QB", "RB", "WR", "TE"] as Pos[]).flatMap((pos) => {
+    const w = POS_WORDS[pos];
+    return [
+      { re: new RegExp(`(?:needs?|wants?|looking for|after|hunting|desperate for|short (?:at|on))[^.,;!?]{0,20}\\b${w}\\b`),
+        label: `looking for a ${pos}`, apply: (o: ProfileOverride) => { o.tradeWants = { ...o.tradeWants, [pos]: 2 }; } },
+      { re: new RegExp(`(?:selling|shopping|trading away|has too many|deep at|loaded at|surplus (?:at|of))[^.,;!?]{0,20}\\b${w}\\b`),
+        label: `trying to move ${pos}s`, apply: (o: ProfileOverride) => { o.tradeWants = { ...o.tradeWants, [pos]: -1.5 }; } },
+    ];
+  }),
+];
+
+export function applyTradeDescription(o: ProfileOverride, text: string): { override: ProfileOverride; understood: string[] } {
+  const next: ProfileOverride = { ...o, lean: { ...o.lean }, tradeWants: { ...o.tradeWants }, tradeNote: text };
+  const t = text.toLowerCase();
+  const understood: string[] = [];
+  for (const r of TRADE_RULES) if (r.re.test(t)) { r.apply(next); understood.push(r.label); }
+  return { override: next, understood };
+}
+
+/** Short summary of someone's trade habits for list rows ("trades often · needs to win · wants RB"). */
+export function tradeSummary(o: ProfileOverride): string[] {
+  const out: string[] = [];
+  if (o.tradeOpenness) out.push(`trades ${o.tradeOpenness > 0 ? "often" : "rarely"}`);
+  if ((o.tradeWin ?? 0) >= 1) out.push("needs to win");
+  if ((o.tradeWin ?? 0) <= -1) out.push("takes fair deals");
+  if ((o.nameValue ?? 1) >= 1.5) out.push("big names sell");
+  if ((o.nameValue ?? 1) <= 0.5) out.push("points only");
+  const wants = Object.entries(o.tradeWants ?? {}).filter(([, v]) => (v ?? 0) > 0).map(([p]) => p);
+  if (wants.length) out.push(`wants ${wants.join("/")}`);
+  if ((o.packages ?? 0) > 0) out.push("likes 2-for-1s");
+  if ((o.packages ?? 0) < 0) out.push("wants depth");
+  return out;
+}
+
 export function applyDescription(o: ProfileOverride, text: string): { override: ProfileOverride; understood: string[] } {
   const next: ProfileOverride = { ...o, lean: { ...o.lean }, note: text, preset: "custom" };
   const t = text.toLowerCase();
@@ -121,6 +171,7 @@ export function effectiveProfile(managerId: string, name: string, learned: Leagu
   return {
     ...base, name, posBias: {}, posBiasByPhase: { early, mid, late }, noise: o.noise, rookieBias: o.rookieBias,
     runSensitivity: o.runSensitivity, tradeOpenness: o.tradeOpenness,
+    tradeWin: o.tradeWin, nameValue: o.nameValue, tradeWants: o.tradeWants, packages: o.packages,
     style: `${presetLabel ?? (o.preset === "learned" ? "learned, edited" : "custom")} · set by you`,
   };
 }

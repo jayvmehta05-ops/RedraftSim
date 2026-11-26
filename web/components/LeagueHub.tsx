@@ -11,6 +11,7 @@ import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import Glide from "./Glide";
 import type { SwipeTarget } from "./useSwipePages";
 import LuckMeter from "./LuckMeter";
+import { LoanPrompt } from "./Loans";
 import MyTeam from "./MyTeam";
 import PlayoffOdds from "./PlayoffOdds";
 import StartSit from "./StartSit";
@@ -195,6 +196,7 @@ export default function LeagueHub(props: {
           </div>
         </div>
       )}
+      {league && !offseason && <LoanPrompt board={props.board} league={league} myManager={myManager} onLeagueEdit={props.onLeagueEdit} />}
       {needsLogin && league?.provider === "espn" && (
         <EspnLogin busy={refreshing} error={refreshError && /rejected/i.test(refreshError) ? refreshError : null} onSubmit={(a, remember) => { if (remember) rememberEspnAuth(a); refresh(a); }} />
       )}
@@ -220,7 +222,8 @@ export default function LeagueHub(props: {
       )}
       {!offseason && section === "team" && !blocked && league && myManager && (
         <MyTeam board={props.board} cfg={props.cfg} league={league} myManager={myManager} leaguemates={props.leaguemates}
-          weeksLeft={weeksLeft} tradesOpen={phase.tradesOpen} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} onLeagueEdit={props.onLeagueEdit} />
+          weeksLeft={weeksLeft} tradesOpen={phase.tradesOpen} keeper={props.keeper} onGo={setSection} onOpenEditor={props.onOpenEditor} onLeagueEdit={props.onLeagueEdit}
+          week={props.throughWeek + 1} />
       )}
       {!offseason && section === "startsit" && !blocked && league && myManager && (
         <StartSit board={props.board} cfg={props.cfg} league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />

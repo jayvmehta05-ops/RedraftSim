@@ -11,6 +11,7 @@ import {
 import { IconLock, IconSwap, IconUnlock } from "./icons";
 import { HorizonToggle, horizonLabel } from "./Waivers";
 import { lockedSet, resolveRoster, toggleLock, unmatchedCount } from "@/lib/rosters";
+import { afterLoans } from "@/lib/loans";
 import { PosBadge, fmt } from "./ui";
 import RateTrade, { applyTradeRating, reportTradeRating } from "./RateTrade";
 import { type Rating, describeTuning } from "@/lib/tradeTuning";
@@ -223,13 +224,14 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
     setRated(r.vote === "up" ? "Thanks for the rating." : "Thanks. Suggestions below are updated for your rating.");
   };
 
+  // Rosters as they'll be once 1-week loans end: players you lent out count as yours, borrowed ones as theirs
   const teams = useMemo(() => {
     if (!league?.rosters) return [];
-    return league.rosters.map((r) => {
+    return afterLoans(league.rosters.map((r) => {
       const players = resolveRoster(r, byId, byEspn);
       const roster: Valued[] = players.map((p) => ({ p, v: playerValue(p, horizon, weeksLeft) }));
       return { id: r.managerId, name: names.get(r.managerId) ?? `Team ${r.managerId}`, roster, unmatched: unmatchedCount(r, byId, byEspn) };
-    });
+    }), league.rules?.loans);
   }, [league, byId, byEspn, names, horizon, weeksLeft]);
 
   const me = teams.find((t) => t.id === myManager) ?? null;

@@ -20,6 +20,14 @@ export interface LeaguemateProfile extends BotProfile {
   picksSeen: number;
   /** -2 (never trades) .. +2 (trades anything); set manually in the leaguemate editor */
   tradeOpenness?: number;
+  /** -2 (happy with a fair deal) .. +2 (only takes trades they clearly win) */
+  tradeWin?: number;
+  /** 0 (only cares about lineup points) .. 2 (sold on big names / draft position); 1 = typical */
+  nameValue?: number;
+  /** positions they're looking for (+) or trying to move (-) in trades, -2..+2 */
+  tradeWants?: Partial<Record<"QB" | "RB" | "WR" | "TE", number>>;
+  /** -1 (wants depth: more players back) .. +1 (likes consolidating into fewer, better players) */
+  packages?: number;
 }
 
 export function buildLeaguemateBots(league: ImportedLeague): LeaguemateProfile[] {

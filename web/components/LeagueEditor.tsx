@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import {
-  PRESETS, type ProfileOverride, applyDescription, applyPreset, overrideFromLearned,
+  PRESETS, type ProfileOverride, applyDescription, applyPreset, applyTradeDescription, overrideFromLearned, tradeSummary,
 } from "@/lib/profiles";
 import { boardMaps, resolveRoster } from "@/lib/rosters";
 import { SOURCE } from "@/lib/season";
@@ -76,6 +76,8 @@ function ManagerCard({ name, learned, override, onOverride, onReset, roster, onR
   const [open, setOpen] = useState(false);
   const [desc, setDesc] = useState(override?.note ?? "");
   const [understood, setUnderstood] = useState<string[] | null>(null);
+  const [tradeDesc, setTradeDesc] = useState(override?.tradeNote ?? "");
+  const [tradeUnderstood, setTradeUnderstood] = useState<string[] | null>(null);
   const [q, setQ] = useState("");
   const o = override ?? overrideFromLearned(learned);
   const set = (patch: Partial<ProfileOverride>) => onOverride({ ...o, ...patch, preset: patch.preset ?? "custom" });
@@ -95,7 +97,7 @@ function ManagerCard({ name, learned, override, onOverride, onReset, roster, onR
             {override && <span className="rounded bg-slate-700 px-1.5 text-[10px] font-semibold text-slate-200">EDITED</span>}
           </div>
           <div className="truncate text-[11px] text-slate-500">
-            {override ? (leans.join(" · ") || "balanced") + (o.tradeOpenness ? ` · trades ${o.tradeOpenness > 0 ? "often" : "rarely"}` : "")
+            {override ? [leans.join(" · ") || "balanced", ...tradeSummary(o)].join(" · ")
               : learned?.picksSeen ? learned.style : "no draft history yet (balanced)"}
             {roster ? ` · ${roster.length} players` : ""}
           </div>
@@ -110,9 +112,9 @@ function ManagerCard({ name, learned, override, onOverride, onReset, roster, onR
           {!isMe && (
             <>
               <div>
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Describe how they draft and trade</div>
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">Describe how they draft</div>
                 <textarea value={desc} onChange={(e) => setDesc(e.target.value)} rows={2}
-                  placeholder="e.g. takes a QB early, loves rookies, reaches a lot, never trades"
+                  placeholder="e.g. takes a QB early, loves rookies, reaches a lot"
                   className="w-full rounded-md bg-slate-800 px-3 py-2 text-sm text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
                 <div className="mt-1 flex items-center gap-2">
                   <button onClick={() => { const r = applyDescription(o, desc); onOverride(r.override); setUnderstood(r.understood); }}
@@ -135,9 +137,40 @@ function ManagerCard({ name, learned, override, onOverride, onReset, roster, onR
                 <Slider label="Randomness" value={o.noise} min={0.5} max={8} step={0.5} onChange={(v) => set({ noise: v })} left="by the book" right="chaos" />
                 <Slider label="Rookies vs veterans" value={o.rookieBias} min={-8} max={8} step={1} onChange={(v) => set({ rookieBias: v })} left="vets only" right="loves rookies" />
                 <Slider label="Follows positional runs" value={o.runSensitivity} min={0} max={2.5} step={0.1} onChange={(v) => set({ runSensitivity: v })} left="ignores" right="herd" />
-                <Slider label="Trade openness" value={o.tradeOpenness} min={-2} max={2} step={0.5} onChange={(v) => set({ tradeOpenness: v })} left="never trades" right="trades anything" />
               </div>
-              {override && <button onClick={() => { onReset(); setDesc(""); setUnderstood(null); }} className="text-xs text-slate-400 underline hover:text-white">Reset to {learned?.picksSeen ? "what was learned from past drafts" : "balanced"}</button>}
+              <div className="rounded-lg bg-slate-950/50 p-3 ring-1 ring-slate-800">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">How they trade</div>
+                <textarea value={tradeDesc} onChange={(e) => setTradeDesc(e.target.value)} rows={2}
+                  placeholder="e.g. trades a lot but always wants to win, needs a RB, loves big names, likes 2-for-1s"
+                  className="w-full rounded-md bg-slate-800 px-3 py-2 text-sm text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  <button onClick={() => { const r = applyTradeDescription(o, tradeDesc); onOverride({ ...r.override, preset: o.preset === "learned" ? "learned" : r.override.preset }); setTradeUnderstood(r.understood); }}
+                    disabled={!tradeDesc.trim()} className="rounded-md bg-emerald-500 px-3 py-1 text-xs font-bold text-slate-950 disabled:bg-slate-800 disabled:text-slate-600">Apply</button>
+                  {tradeUnderstood && <span className="text-[11px] text-slate-400">{tradeUnderstood.length ? `Understood: ${tradeUnderstood.join(", ")}` : "Didn't recognize anything. Try “needs to win”, “wants a RB”, “big names”, “trades a lot”, “likes 2-for-1s”."}</span>}
+                </div>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <Slider label="Trade openness" value={o.tradeOpenness} min={-2} max={2} step={0.5} onChange={(v) => set({ tradeOpenness: v })} left="never trades" right="trades anything" />
+                  <Slider label="Needs to win the trade" value={o.tradeWin ?? 0} min={-2} max={2} step={0.5} onChange={(v) => set({ tradeWin: v })} left="fair is fine" right="must win big" />
+                  <Slider label="Big names vs points" value={o.nameValue ?? 1} min={0} max={2} step={0.1} onChange={(v) => set({ nameValue: v })} left="points only" right="sold on names" />
+                  <Slider label="2-for-1s" value={o.packages ?? 0} min={-1} max={1} step={0.5} onChange={(v) => set({ packages: v })} left="wants depth" right="likes consolidating" />
+                </div>
+                <div className="mt-3">
+                  <div className="mb-1 text-[11px] text-slate-400">Looking for (tap to cycle: wants → selling → neither)</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {POSITIONS.map((pos) => {
+                      const v = o.tradeWants?.[pos] ?? 0;
+                      return (
+                        <button key={pos} type="button"
+                          onClick={() => set({ tradeWants: { ...o.tradeWants, [pos]: v > 0 ? -1.5 : v < 0 ? 0 : 2 } })}
+                          className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ring-1 ${v > 0 ? "bg-emerald-500 text-slate-950 ring-emerald-400" : v < 0 ? "bg-amber-500/15 text-amber-200 ring-amber-500/40" : "bg-slate-800 text-slate-300 ring-slate-700"}`}>
+                          {v > 0 ? `Wants ${pos}` : v < 0 ? `Selling ${pos}` : pos}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+              {override && <button onClick={() => { onReset(); setDesc(""); setUnderstood(null); setTradeDesc(""); setTradeUnderstood(null); }} className="text-xs text-slate-400 underline hover:text-white">Reset to {learned?.picksSeen ? "what was learned from past drafts" : "balanced"}</button>}
             </>
           )}
           {roster && (
