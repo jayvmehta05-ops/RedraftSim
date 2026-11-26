@@ -10,7 +10,9 @@ import { seasonPhase } from "@/lib/phase";
 import { keepRosterEdits, keeperOn } from "@/lib/rosters";
 import AccountButton from "./AccountButton";
 import BigBoard from "./BigBoard";
+import HelpPanel, { HelpButton } from "./HelpPanel";
 import LeagueEditor from "./LeagueEditor";
+import { MAIN_HELP } from "@/lib/help";
 import FeedbackButton from "./Feedback";
 import KeeperCalc from "./KeeperCalc";
 import LiveDraft from "./LiveDraft";
@@ -87,6 +89,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
   const [toggles, setToggles] = useState<Toggles>(defaults);
   const [tab, setTab] = useState<Tab>("board");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [siteKeeper, setSiteKeeper] = useState(false);
   const keeper = keeperOn(league, siteKeeper);
   const tabs = TABS.filter((t) => t.id !== "keepers" || keeper);
@@ -250,13 +253,14 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           </div>
           <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Sections">
             {tabs.map((t) => (
-              <button key={t.id} onClick={() => go(t.id)} aria-current={tab === t.id ? "page" : undefined}
+              <button key={t.id} onClick={() => go(t.id)} aria-current={tab === t.id ? "page" : undefined} title={MAIN_HELP[t.id].what}
                 className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
                 {t.label}
               </button>
             ))}
           </nav>
           <div className="ml-auto flex items-center gap-2"><AccountButton /></div>
+          <HelpButton onClick={() => setHelpOpen(true)} />
           <div className="lg:hidden"><FeedbackButton inline context={{ tab, league: league ? league.provider : "none" }} /></div>
           <button onClick={() => setSettingsOpen(true)}
             className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ring-1 transition ${nonDefault || league ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/40 hover:bg-emerald-500/20" : "bg-slate-900 text-slate-200 ring-slate-700 hover:bg-slate-800"}`}>
@@ -275,7 +279,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
       <main className="mx-auto max-w-7xl px-4 pb-28 pt-5 lg:pb-10">
         {tab === "board" && (
-          <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} />
+          <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} onHelp={() => setHelpOpen(true)} />
         )}
         {tab === "board" && <BigBoard board={board} cfg={cfg} nonDefault={nonDefault} showEspn={m.publication?.show_espn_fields !== false} />}
         {tab === "mock" && <DraftHub board={board} cfg={cfg} leaguemates={leaguemates} myManager={myManager} leagueName={league?.name ?? null} onOpenEditor={() => setEditorOpen(true)} />}
@@ -326,6 +330,8 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         savedLeagues={Object.entries(savedLeagues).map(([key, l]) => ({ key, name: l.name, provider: l.provider }))}
         activeKey={league ? leagueKey(league) : null} onSwitchLeague={switchLeague} keeper={keeper} onKeeper={setKeeper}
         onOpenEditor={() => { setSettingsOpen(false); setEditorOpen(true); }} />
+      <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} onGo={(t) => go(t)} hasLeague={!!league}
+        hasTeam={!!league && !!myManager && league.managers.some((x) => x.id === myManager)} keeper={keeper} onOpenSettings={() => setSettingsOpen(true)} />
       <LeagueEditor open={editorOpen} onClose={() => setEditorOpen(false)} board={board} cfg={cfg} league={league}
         learned={learned} overrides={overrides} onOverrides={setOverrides} onLeagueChange={editLeague} myManager={myManager} />
     </div>

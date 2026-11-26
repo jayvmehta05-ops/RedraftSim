@@ -71,6 +71,53 @@ const SECTIONS: { title: string; what: string; how: string[]; tip?: string }[] =
     ],
   },
   {
+    title: "My League: how it's organized",
+    what: "Once your league is imported, My League holds every in-season tool, grouped by what you're trying to do. A banner at the top says where you are in the season (for example, days left until your trade deadline) and what to focus on.",
+    how: [
+      "This week: Start/Sit (your lineup) and Waivers (pickups).",
+      "Your team: Rosters (any team's roster, click a player for trade ideas) and Trades (deal ideas and a trade checker).",
+      "Whole league: Power rankings, Playoff odds and the Luck meter.",
+      "The site adapts to the calendar: after your trade deadline, trade ideas switch off and Start/Sit comes first; during the playoffs, values count only the weeks left.",
+      "Rosters refresh from Sleeper or ESPN every 10 minutes while you use My League; press Refresh now after a trade or pickup.",
+    ],
+  },
+  {
+    title: "Start/Sit",
+    what: "Who to put in your lineup this week.",
+    how: [
+      "Uses ESPN's projections for this week, scored with your league's rules, plus each player's matchup, kickoff time, bye and injury status.",
+      "Compares the best lineup with the one you've actually set on Sleeper or ESPN and lists exactly who to start and bench.",
+      "Toss-ups (within 1.5 points) are flagged. Players whose game has started stay locked where they are.",
+    ],
+  },
+  {
+    title: "Rosters and click-to-trade",
+    what: "See any team's best lineup and bench, and start a trade from any player.",
+    how: [
+      "Pick a team from the dropdown. Click another team's player for offers that manager would likely accept, or a 1-week trade if your league allows them (turn that on in the league editor's League rules).",
+      "Click your own player to see the best offers from every team.",
+      "Lock a player who can't be traded right now (for example he's on a 1-week trade): he still counts in lineups but never appears in trade ideas.",
+    ],
+  },
+  {
+    title: "Playoff odds",
+    what: "Each team's chance to make the playoffs, get a bye and win the title, from 10,000 simulated finishes to the season.",
+    how: [
+      "Plays out your league's real remaining schedule using each roster's projections and how it has actually scored.",
+      "Shows what this week's game is worth to you (odds if you win vs lose) and which other games to root for.",
+      "Tap Share card for a link and image to post in your league chat.",
+    ],
+  },
+  {
+    title: "Luck meter",
+    what: "Has your schedule helped or hurt you?",
+    how: [
+      "All-play record: how you'd do playing every team every week. Expected wins: what your weekly scores earned.",
+      "Luck = actual wins minus expected wins. It also shows the best and worst record your scores could have had with other teams' schedules.",
+      "Tap Share card to post it.",
+    ],
+  },
+  {
     title: "Waivers and power rankings",
     what: "In-season help from your imported league's rosters: the best free agents for your lineup, and every team ranked by roster strength.",
     how: [

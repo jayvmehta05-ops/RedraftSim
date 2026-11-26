@@ -7,7 +7,7 @@ import { IconClose, IconImport, IconLive, IconMock } from "./icons";
 const KEY = "redraft.welcomeDismissed";
 
 /** First-visit welcome: what the site is for and the three things to do first. Dismissible. */
-export default function Welcome({ onImport, onMock, onLive }: { onImport: () => void; onMock: () => void; onLive: () => void }) {
+export default function Welcome({ onImport, onMock, onLive, onHelp }: { onImport: () => void; onMock: () => void; onLive: () => void; onHelp?: () => void }) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     try {
@@ -55,6 +55,11 @@ export default function Welcome({ onImport, onMock, onLive }: { onImport: () => 
           </button>
         ))}
       </div>
+      {onHelp && (
+        <button onClick={onHelp} className="mt-3 text-xs font-semibold text-emerald-300 hover:text-emerald-200">
+          New here? See what every tab does →
+        </button>
+      )}
     </section>
   );
 }

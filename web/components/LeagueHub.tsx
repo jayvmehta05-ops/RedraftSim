@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } from "@/lib/refresh";
 import type { LeaguemateProfile } from "@/lib/leaguemates";
+import { LEAGUE_GROUPS, LEAGUE_HELP } from "@/lib/help";
 import { seasonPhase } from "@/lib/phase";
 import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
@@ -135,14 +136,23 @@ export default function LeagueHub(props: {
 
   return (
     <div className="space-y-4">
-      <div className="flex max-w-full overflow-x-auto rounded-xl bg-slate-900 p-1 ring-1 ring-slate-800 sm:inline-flex">
-        {sections.map((s) => (
-          <button key={s.id} onClick={() => setSection(s.id)}
-            className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${section === s.id ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"}`}>
-            {s.label}
-          </button>
+      {/* Tools grouped by what you're trying to do, with a plain description of the open one */}
+      <div className="no-scrollbar -mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+        {LEAGUE_GROUPS.map((g) => (
+          <div key={g.label} className="shrink-0">
+            <div className="mb-1 px-1 text-[10px] font-bold tracking-wider text-slate-500 uppercase">{g.label}</div>
+            <div className="flex rounded-xl bg-slate-900 p-1 ring-1 ring-slate-800">
+              {g.ids.map((id) => (
+                <button key={id} onClick={() => setSection(id)} title={LEAGUE_HELP[id].what} aria-pressed={section === id}
+                  className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition ${section === id ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>
+                  {LEAGUE_HELP[id].name}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
+      <p className="-mt-1 text-sm text-slate-300"><b className="text-white">{LEAGUE_HELP[section].name}:</b> {LEAGUE_HELP[section].what}</p>
       {league && !offseason && (
         <div className="flex items-start gap-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-transparent px-4 py-3 ring-1 ring-emerald-500/20">
           <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${phase.phase === "playoffs" ? "animate-pulse bg-amber-400" : "bg-emerald-400"}`} aria-hidden />
