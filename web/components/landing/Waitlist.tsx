@@ -1,13 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
-/** Email sign-up for what's coming next. Posts to /api/waitlist. */
+const REF_KEY = "redraft.ref";
+
+/** Where this visitor came from: ?ref=tiktok on the link they clicked, remembered for the visit. */
+function visitRef(): string | null {
+  try {
+    const fromUrl = new URLSearchParams(window.location.search).get("ref");
+    if (fromUrl) sessionStorage.setItem(REF_KEY, fromUrl);
+    return (fromUrl ?? sessionStorage.getItem(REF_KEY))?.replace(/[^\w-]/g, "").slice(0, 40) || null;
+  } catch {
+    return null;
+  }
+}
+
+/** Email sign-up for what's coming next. Posts to /api/waitlist with the platform the visitor came from. */
 export default function Waitlist({ source = "home" }: { source?: string }) {
   const [email, setEmail] = useState("");
   const [hp, setHp] = useState(""); // honeypot: hidden from people, bots fill it
   const [state, setState] = useState<"idle" | "busy" | "done" | "already" | "error">("idle");
   const [msg, setMsg] = useState<string | null>(null);
+  useEffect(() => { visitRef(); }, []); // remember ?ref= even if they browse around before joining
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -17,7 +31,7 @@ export default function Waitlist({ source = "home" }: { source?: string }) {
     try {
       const r = await fetch("/api/waitlist", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, source, website: hp }),
+        body: JSON.stringify({ email, source: visitRef() ?? source, website: hp }),
       });
       const body = await r.json().catch(() => ({}));
       if (!r.ok) { setState("error"); setMsg(body.error ?? "Something went wrong. Try again."); return; }
