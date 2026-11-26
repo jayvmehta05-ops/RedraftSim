@@ -6,7 +6,7 @@
  * and normalizes it to this app's LeagueConfig shape.
  */
 import { SITE_URL } from "./season";
-import type { ImportedLeague, LeagueDraft, Scoring } from "./types";
+import type { ImportedLeague, LeagueDraft, LeagueTransaction, Scoring } from "./types";
 
 /** ESPN login cookies for private leagues. Passed straight through to ESPN; never stored or logged here. */
 export interface EspnAuth {
@@ -115,7 +115,47 @@ async function sleeperWeekly(lg: SleeperLeague, ownerOf: Map<number, string>) {
   // Completed weeks: up to the last scored week, and never past the first week nobody scored in
   const unplayed = weeks.findIndex((rows) => !rows.some((r) => r.points > 0));
   const played = Math.min(last, unplayed === -1 ? weeks.length : unplayed);
-  return weeklyFrom(weeks, played);
+  return { weekly: weeklyFrom(weeks, played), played };
+}
+
+interface SleeperTxn {
+  type: string; status: string; leg: number; roster_ids?: number[] | null;
+  adds?: Record<string, number> | null; drops?: Record<string, number> | null;
+  settings?: { waiver_bid?: number } | null;
+}
+
+/** This season's completed trades, waiver claims and free-agent pickups (one request per week). */
+export function parseSleeperTransactions(byWeek: SleeperTxn[][], ownerOf: Map<number, string>): LeagueTransaction[] {
+  const out: LeagueTransaction[] = [];
+  byWeek.forEach((rows, i) => {
+    for (const t of Array.isArray(rows) ? rows : []) {
+      if (t?.status !== "complete" || !["trade", "waiver", "free_agent"].includes(t.type)) continue;
+      const ids = Array.from(new Set((t.roster_ids ?? []).map((r) => ownerOf.get(r)).filter((x): x is string => !!x)));
+      if (!ids.length) continue;
+      const tx: LeagueTransaction = { week: Number(t.leg) || i + 1, kind: t.type as LeagueTransaction["kind"], managerIds: ids, adds: Object.keys(t.adds ?? {}).length };
+      if (t.type === "waiver" && t.settings?.waiver_bid != null) tx.bid = Number(t.settings.waiver_bid) || 0;
+      out.push(tx);
+    }
+  });
+  return out;
+}
+
+/** Per-manager totals from a transaction list. */
+export function activityFrom(txns: LeagueTransaction[], byWeek: SleeperTxn[][], ownerOf: Map<number, string>) {
+  const out = new Map<string, { adds: number; drops: number; trades: number; faabSpent: number }>();
+  const get = (id: string) => { if (!out.has(id)) out.set(id, { adds: 0, drops: 0, trades: 0, faabSpent: 0 }); return out.get(id)!; };
+  for (const t of txns) {
+    for (const id of t.managerIds) {
+      if (t.kind === "trade") get(id).trades += 1;
+      else { get(id).adds += t.adds; get(id).faabSpent += t.bid ?? 0; }
+    }
+  }
+  // drops are attributed to the roster that dropped the player (trades excluded: those players moved, not dropped)
+  for (const rows of byWeek) for (const t of Array.isArray(rows) ? rows : []) {
+    if (t?.status !== "complete" || t.type === "trade") continue;
+    for (const rid of Object.values(t.drops ?? {})) { const id = ownerOf.get(rid); if (id) get(id).drops += 1; }
+  }
+  return out;
 }
 
 /** Playoff weeks and trade deadline from Sleeper league settings. */
@@ -165,14 +205,22 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
     settings?: { wins?: number; losses?: number; ties?: number; fpts?: number; fpts_decimal?: number; waiver_budget_used?: number };
   }[]>(
     `https://api.sleeper.app/v1/league/${lg.league_id}/rosters`).catch(() => []);
-  const weekly = await sleeperWeekly(lg, new Map(sleeperRosters.filter((r) => r.owner_id).map((r) => [r.roster_id, String(r.owner_id)])))
-    .catch(() => new Map<string, { weekly: number[]; opponents: (string | null)[] }>());
+  const ownerOf = new Map(sleeperRosters.filter((r) => r.owner_id).map((r) => [r.roster_id, String(r.owner_id)]));
+  const { weekly, played } = await sleeperWeekly(lg, ownerOf)
+    .catch(() => ({ weekly: new Map<string, { weekly: number[]; opponents: (string | null)[] }>(), played: 0 }));
+  // Transactions through the current week (the week after the last scored one)
+  const txWeeks = Math.min(18, Math.max(1, (Number(lg.settings?.last_scored_leg) || played) + 1));
+  const rawTx = await Promise.all(Array.from({ length: txWeeks }, (_, i) =>
+    getJson<SleeperTxn[]>(`https://api.sleeper.app/v1/league/${lg.league_id}/transactions/${i + 1}`).catch(() => [])));
+  const transactions = parseSleeperTransactions(rawTx, ownerOf);
+  const activity = activityFrom(transactions, rawTx, ownerOf);
   const rosters = sleeperRosters
     .filter((r) => r.owner_id)
     .map((r) => ({
       managerId: String(r.owner_id), playerIds: (r.players ?? []).map(String), idType: "sleeper" as const,
       starters: (r.starters ?? []).filter((id) => id && id !== "0").map(String),
       ...weekly.get(String(r.owner_id)),
+      activity: activity.get(String(r.owner_id)) ?? { adds: 0, drops: 0, trades: 0, faabSpent: 0 },
       record: {
         wins: r.settings?.wins ?? 0, losses: r.settings?.losses ?? 0, ties: r.settings?.ties ?? 0,
         pointsFor: (r.settings?.fpts ?? 0) + (r.settings?.fpts_decimal ?? 0) / 100,
@@ -207,7 +255,7 @@ async function importSleeper(id: string): Promise<ImportedLeague> {
   if (leagueType === 1) notes.push("Keeper league: keepers aren't removed from the mock draft pool yet");
   const fullDrafts = drafts.filter((d) => Math.max(0, ...d.picks.map((p) => p.round)) >= Math.min(8, slotsTotal / 2));
   return {
-    rosters, fetchedAt: new Date().toISOString(),
+    rosters, transactions, fetchedAt: new Date().toISOString(),
     provider: "sleeper", leagueId: lg.league_id, season: lg.season, name: lg.name,
     teams: lg.total_rosters, roster, scoring, draftRounds: slotsTotal,
     notes: Array.from(new Set(notes)), managers, drafts: fullDrafts,
@@ -230,7 +278,7 @@ interface EspnLeague {
     id: number; name?: string; location?: string; nickname?: string; owners?: string[];
     roster?: { entries?: { playerId: number; lineupSlotId?: number }[] };
     record?: { overall?: { wins?: number; losses?: number; ties?: number; pointsFor?: number } };
-    transactionCounter?: { acquisitionBudgetSpent?: number };
+    transactionCounter?: { acquisitionBudgetSpent?: number; acquisitions?: number; drops?: number; trades?: number; moveToActive?: number };
   }[];
   members?: { id: string; displayName: string }[];
   draftDetail?: { drafted?: boolean; picks?: { overallPickNumber: number; roundId: number; teamId: number; playerId: number }[] };
@@ -346,6 +394,10 @@ async function importEspn(id: string, season: number, auth?: EspnAuth): Promise<
       // lineup slot 20 = bench, 21 = IR; everything else is a starting slot
       starters: (t.roster?.entries ?? []).filter((e) => e.lineupSlotId != null && e.lineupSlotId !== 20 && e.lineupSlotId !== 21).map((e) => String(e.playerId)),
       ...weekly.get(String(t.id)),
+      activity: t.transactionCounter ? {
+        adds: t.transactionCounter.acquisitions ?? 0, drops: t.transactionCounter.drops ?? 0, trades: t.transactionCounter.trades ?? 0,
+        faabSpent: t.transactionCounter.acquisitionBudgetSpent, lineupMoves: t.transactionCounter.moveToActive,
+      } : undefined,
       record: {
         wins: t.record?.overall?.wins ?? 0, losses: t.record?.overall?.losses ?? 0, ties: t.record?.overall?.ties ?? 0,
         pointsFor: t.record?.overall?.pointsFor ?? 0,

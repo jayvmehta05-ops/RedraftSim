@@ -163,6 +163,16 @@ export interface LeagueDraft {
   type: string;
   picks: LeagueDraftPick[];
 }
+export interface LeagueTransaction {
+  week: number;
+  kind: "trade" | "waiver" | "free_agent";
+  /** managers involved (one for adds/drops, two or more for a trade) */
+  managerIds: string[];
+  /** players added (summed over everyone involved) */
+  adds: number;
+  /** winning FAAB bid for a waiver claim */
+  bid?: number;
+}
 /** A league imported from Sleeper or ESPN by /api/league. */
 export interface ImportedLeague {
   /** "manual" = set up by hand in the leaguemate editor (no platform import) */
@@ -196,7 +206,11 @@ export interface ImportedLeague {
     opponents?: (string | null)[];
     /** player ids (same id type as playerIds) the manager has in their starting lineup on the platform right now */
     starters?: string[];
+    /** season-to-date roster activity (Sleeper: counted from transactions; ESPN: the team's transaction counter) */
+    activity?: { adds: number; drops: number; trades: number; faabSpent?: number; lineupMoves?: number };
   }[];
+  /** Completed transactions this season (Sleeper only; ESPN reports totals in rosters[].activity). Used by scouting reports. */
+  transactions?: LeagueTransaction[];
   fetchedAt?: string;
   /** League rules the user sets by hand (kept across refreshes) */
   rules?: {

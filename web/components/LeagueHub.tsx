@@ -11,10 +11,11 @@ import MyTeam from "./MyTeam";
 import PlayoffOdds from "./PlayoffOdds";
 import StartSit from "./StartSit";
 import PowerRankings from "./PowerRankings";
+import Scouting, { ProBadge } from "./Scouting";
 import TradeAssistant from "./TradeAssistant";
 import Waivers from "./Waivers";
 
-type Section = "team" | "startsit" | "trades" | "waivers" | "power" | "odds" | "luck";
+type Section = "team" | "startsit" | "trades" | "waivers" | "scout" | "power" | "odds" | "luck";
 
 /** Shown when ESPN needs fresh login cookies for a private league; retries the refresh on submit. */
 function EspnLogin({ onSubmit, busy, error }: { onSubmit: (a: EspnAuth, remember: boolean) => void; busy: boolean; error: string | null }) {
@@ -117,11 +118,12 @@ export default function LeagueHub(props: {
   })();
   // Waivers and power rankings need rosters (and waivers needs your team); the Trades view walks users through that
   const ready = !!league?.rosters?.some((r) => r.playerIds.length || (r.manualIds ?? []).length);
-  const sections: { id: Section; label: string; needsMe: boolean }[] = [
+  const sections: { id: Section; label: string; needsMe: boolean; pro?: boolean }[] = [
     { id: "team", label: "Rosters", needsMe: true },
     { id: "startsit", label: "Start/Sit", needsMe: true },
     { id: "trades", label: "Trades", needsMe: true },
     { id: "waivers", label: "Waivers", needsMe: true },
+    { id: "scout", label: "Scouting", needsMe: false, pro: true },
     { id: "power", label: "Power rankings", needsMe: false },
     { id: "odds", label: "Playoff odds", needsMe: false },
     { id: "luck", label: "Luck meter", needsMe: false },
@@ -139,7 +141,7 @@ export default function LeagueHub(props: {
         {sections.map((s) => (
           <button key={s.id} onClick={() => setSection(s.id)}
             className={`flex-1 whitespace-nowrap rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${section === s.id ? "bg-slate-700 text-white" : "text-slate-400 hover:text-white"}`}>
-            {s.label}
+            {s.label}{s.pro && <ProBadge className="ml-1.5 align-middle" />}
           </button>
         ))}
       </div>
@@ -190,6 +192,10 @@ export default function LeagueHub(props: {
       )}
       {section === "luck" && !blocked && league && (
         <LuckMeter league={league} myManager={myManager} onRefresh={() => refresh()} refreshing={refreshing} />
+      )}
+      {!offseason && section === "scout" && !blocked && league && (
+        <Scouting board={props.board} cfg={props.cfg} league={league} myManager={myManager} leaguemates={props.leaguemates}
+          weeksLeft={weeksLeft} onRefresh={() => refresh()} refreshing={refreshing} />
       )}
       {!offseason && section === "power" && !blocked && league && (
         <PowerRankings board={props.board} cfg={props.cfg} league={league} myManager={myManager} weeksLeft={weeksLeft} keeper={props.keeper} />
