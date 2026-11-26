@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-type Kind = "general" | "bug" | "idea" | "projections" | "mock_realism";
+type Kind = "general" | "bug" | "idea" | "projections" | "mock_realism" | "trade_rating";
 
 export async function sendFeedback(payload: {
   kind: Kind; score?: number | null; message?: string; email?: string; context?: Record<string, string>; website?: string;

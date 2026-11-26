@@ -206,6 +206,8 @@ export interface ImportedLeague {
     keeper?: boolean;
     /** board player ids that can't be traded right now (e.g. on a 1-week trade); kept across refreshes */
     locked?: string[];
+    /** how your trade ratings have tuned the trade assistant for this league (lib/tradeTuning.ts) */
+    tradeTuning?: TradeTuning;
   };
   /** league format as the platform reports it */
   kind?: "redraft" | "keeper" | "dynasty";
@@ -220,4 +222,20 @@ export interface ImportedLeague {
     /** how many teams make the playoffs */
     playoffTeams?: number;
   };
+}
+
+/** Trade assistant settings tuned by your trade ratings (see lib/tradeTuning.ts). Missing = default. */
+export interface TradeTuning {
+  /** smallest lineup gain (share of your lineup) a suggested trade must add */
+  minGainPct?: number;
+  /** multiplier on how much your first backup at each position is worth */
+  depthBoost?: number;
+  thinVotes?: number;
+  /** hide trades that leave an empty spot or no backup */
+  hideThin?: boolean;
+  /** lowest acceptance chance a suggestion may have */
+  minAccept?: number;
+  /** managerId -> how much harder a sell they are than their profile says */
+  partnerPenalty?: Record<string, number>;
+  votes?: { up: number; down: number };
 }

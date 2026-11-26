@@ -12,6 +12,8 @@ import { IconLock, IconSwap, IconUnlock } from "./icons";
 import { HorizonToggle, horizonLabel } from "./Waivers";
 import { lockedSet, resolveRoster, toggleLock, unmatchedCount } from "@/lib/rosters";
 import { PosBadge, fmt } from "./ui";
+import RateTrade, { applyTradeRating, reportTradeRating } from "./RateTrade";
+import { type Rating, describeTuning } from "@/lib/tradeTuning";
 
 interface Props {
   board: RankedPlayer[];
@@ -143,7 +145,10 @@ export function LineupDiff({ t, cfg }: { t: TradeEval; cfg: LeagueConfig }) {
   );
 }
 
-export function TradeCard({ t, partnerName, onAnalyze, note, cfg }: { t: TradeEval; partnerName: string; onAnalyze?: () => void; note?: string; cfg?: LeagueConfig }) {
+/** Stable identity for a trade idea (so a rated card keeps its state when the list re-sorts). */
+export const tradeKey = (t: TradeEval) => `${t.partnerId}:${t.give.map((p) => p.id).sort().join(",")}>${t.get.map((p) => p.id).sort().join(",")}`;
+
+export function TradeCard({ t, partnerName, onAnalyze, note, cfg, onRate }: { t: TradeEval; partnerName: string; onAnalyze?: () => void; note?: string; cfg?: LeagueConfig; onRate?: (r: Rating) => void }) {
   const a = acceptLabel(t.accept);
   const pct = (x: number, base: number) => `${x >= 0 ? "+" : ""}${((x / Math.max(base, 1)) * 100).toFixed(1)}%`;
   return (
@@ -179,6 +184,7 @@ export function TradeCard({ t, partnerName, onAnalyze, note, cfg }: { t: TradeEv
       )}
       {note && <p className="mt-2 text-[11px] text-amber-300/90">{note}</p>}
       {onAnalyze && <button onClick={onAnalyze} className="mt-3 text-xs font-semibold text-emerald-400 hover:underline">Tweak in the analyzer →</button>}
+      {onRate && <RateTrade t={t} onRate={onRate} />}
     </div>
   );
 }
@@ -207,6 +213,15 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
   const names = useMemo(() => new Map((league?.managers ?? []).map((m) => [m.id, m.name])), [league]);
   const leans = useMemo(() => new Map(leaguemates.map((l) => [l.managerId, l])), [leaguemates]);
   const locked = useMemo(() => lockedSet(league), [league]);
+  const tuning = league?.rules?.tradeTuning;
+  const tuned = describeTuning(tuning);
+  const [rated, setRated] = useState<string | null>(null); // confirmation after a rating (the card may drop out of the list)
+  const rate = (t: TradeEval, r: Rating) => {
+    if (!league) return;
+    onLeagueEdit(applyTradeRating(league, t, r));
+    reportTradeRating(t, r, league.provider);
+    setRated(r.vote === "up" ? "Thanks for the rating." : "Thanks. Suggestions below are updated for your rating.");
+  };
 
   const teams = useMemo(() => {
     if (!league?.rosters) return [];
@@ -220,9 +235,9 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
   const me = teams.find((t) => t.id === myManager) ?? null;
   const partners: Partner[] = teams.filter((t) => t.id !== myManager).map((t) => ({ id: t.id, name: t.name, roster: t.roster, lean: leans.get(t.id) }));
   const suggestions = useMemo(
-    () => (me ? findTrades(me.roster, partners, cfg, undefined, locked) : []),
+    () => (me ? findTrades(me.roster, partners, cfg, undefined, locked, tuning) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [me, teams, cfg, locked],
+    [me, teams, cfg, locked, tuning],
   );
 
   const leagueAvg = useMemo(() => {
@@ -263,7 +278,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
   const partner = partners.find((p) => p.id === partnerId) ?? null;
   const giveP = me.roster.filter((x) => give.has(x.p.id) && !locked.has(x.p.id)).map((x) => x.p);
   const getP = partner ? partner.roster.filter((x) => get.has(x.p.id) && !locked.has(x.p.id)).map((x) => x.p) : [];
-  const custom = partner && (giveP.length || getP.length) ? evaluateTrade(me.roster, partner.roster, giveP, getP, cfg, partner.id, partner.lean) : null;
+  const custom = partner && (giveP.length || getP.length) ? evaluateTrade(me.roster, partner.roster, giveP, getP, cfg, partner.id, partner.lean, undefined, true, tuning) : null;
   const toggle = (set: Set<string>, id: string, fn: (s: Set<string>) => void) => {
     const n = new Set(set);
     if (n.has(id)) n.delete(id); else n.add(id);
@@ -318,12 +333,20 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
       ) : (<>
       <div>
         <h2 className="mb-2 text-sm font-semibold text-white">Suggested trades</h2>
+        {rated && <p className="ff-fade mb-2 text-xs text-emerald-300">{rated}</p>}
+        {tuned.length > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-2 rounded-lg bg-emerald-500/5 px-3 py-2 text-xs text-slate-300 ring-1 ring-emerald-500/20">
+            <span><b className="text-emerald-300">Tuned by your ratings:</b> {tuned.join("; ")}.</span>
+            <button onClick={() => { onLeagueEdit({ ...league, rules: { ...league.rules, tradeTuning: undefined } }); setRated(null); }}
+              className="ml-auto rounded-md px-2 py-0.5 font-semibold text-slate-400 hover:bg-slate-800 hover:text-white">Reset</button>
+          </div>
+        )}
         {suggestions.length === 0 ? (
           <p className="rounded-xl bg-slate-900/60 p-6 text-sm text-slate-400 ring-1 ring-slate-800">No trades found that clearly help you and that the other side would likely take. Try another time frame, or build one below.</p>
         ) : (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-            {suggestions.map((t, i) => (
-              <TradeCard key={i} t={t} cfg={cfg} partnerName={names.get(t.partnerId) ?? "Team"} onAnalyze={() => openInAnalyzer(t)} />
+            {suggestions.map((t) => (
+              <TradeCard key={tradeKey(t)} t={t} cfg={cfg} partnerName={names.get(t.partnerId) ?? "Team"} onAnalyze={() => openInAnalyzer(t)} onRate={(r) => rate(t, r)} />
             ))}
           </div>
         )}

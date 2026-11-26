@@ -13,7 +13,8 @@
  *   both — sum of the two (keeper / dynasty leagues)
  */
 import type { LeaguemateProfile } from "./leaguemates";
-import type { LeagueConfig, Pos, RankedPlayer } from "./types";
+import type { LeagueConfig, Pos, RankedPlayer, TradeTuning } from "./types";
+import { DEFAULT_MIN_ACCEPT, DEFAULT_MIN_GAIN } from "./tradeTuning";
 import { POSITIONS } from "./types";
 
 export type Horizon = "ros" | "next" | "both" | "week";
@@ -51,7 +52,8 @@ export interface Valued {
 }
 
 /** Best starting lineup value for a roster under the league's slots (greedy is optimal for nested flex slots). */
-export function lineupValue(roster: Valued[], cfg: LeagueConfig): { total: number; starters: Valued[]; bench: Valued[]; startersAt: Record<Pos, number> } {
+/** `depthBoost` scales how much your first backup at each position is worth (your trade ratings can raise it). */
+export function lineupValue(roster: Valued[], cfg: LeagueConfig, depthBoost = 1): { total: number; starters: Valued[]; bench: Valued[]; startersAt: Record<Pos, number> } {
   const byPos: Record<Pos, Valued[]> = { QB: [], RB: [], WR: [], TE: [] };
   for (const x of roster) byPos[x.p.pos]?.push(x);
   for (const pos of POSITIONS) byPos[pos].sort((a, b) => b.v - a.v);
@@ -87,7 +89,7 @@ export function lineupValue(roster: Valued[], cfg: LeagueConfig): { total: numbe
     if (!startersAt[pos]) continue;
     const backup = bench.find((x) => x.p.pos === pos && isHealthy(x.p));
     if (!backup) continue;
-    insurance += backup.v * Math.max(benchW(pos), Math.min(0.5, MISS[pos] * startersAt[pos]));
+    insurance += backup.v * Math.max(benchW(pos), Math.min(0.5, MISS[pos] * startersAt[pos]) * depthBoost);
     insured.add(backup.p.id);
   }
   const depth = bench.filter((x) => !insured.has(x.p.id)).map((x) => x.v * benchW(x.p.pos))
@@ -159,7 +161,8 @@ export function depthReport(before: Valued[], after: Valued[], cfg: LeagueConfig
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
 
 /** How the other manager sees it: lineup gain, how the names look by ADP, and their positional tastes. */
-function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlayer[], lean?: LeaguemateProfile): number {
+/** `penalty` = how much harder a sell this manager is, from your "they'd never accept" ratings. */
+function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlayer[], lean?: LeaguemateProfile, penalty = 0): number {
   // From their side they receive `give` and send `get`.
   const adpScore = (ps: RankedPlayer[]) => ps.reduce((s, p) => s + Math.max(0, 220 - p.cur.adp), 0);
   const perceived = (adpScore(give) - adpScore(get)) / 40;
@@ -171,7 +174,7 @@ function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlaye
   }
   // Lineup impact dominates; name value (ADP) and positional taste nudge it
   return sigmoid(-0.3 + 45 * theirGainPct + 0.25 * Math.max(-3, Math.min(3, perceived)) + 0.5 * taste
-    + 0.6 * (lean?.tradeOpenness ?? 0));
+    + 0.6 * (lean?.tradeOpenness ?? 0) - 0.6 * penalty);
 }
 
 export function evaluateTrade(
@@ -179,19 +182,22 @@ export function evaluateTrade(
   partnerId: string, lean?: LeaguemateProfile, before?: { mine: number; theirs: number },
   /** the trade searches skip the depth report while scoring thousands of combinations, then add it to the winners */
   withDepth = true,
+  /** your ratings' tuning for this league: backups' worth and how hard a sell each manager is */
+  tuning?: TradeTuning,
 ): TradeEval {
+  const boost = tuning?.depthBoost ?? 1;
   const giveIds = new Set(give.map((p) => p.id));
   const getIds = new Set(get.map((p) => p.id));
-  const myBefore = before?.mine ?? lineupValue(mine, cfg).total;
+  const myBefore = before?.mine ?? lineupValue(mine, cfg, boost).total;
   const theirBefore = before?.theirs ?? lineupValue(theirs, cfg).total;
   const myNew = [...mine.filter((x) => !giveIds.has(x.p.id)), ...theirs.filter((x) => getIds.has(x.p.id))];
   const theirNew = [...theirs.filter((x) => !getIds.has(x.p.id)), ...mine.filter((x) => giveIds.has(x.p.id))];
-  const myLineupAfter = lineupValue(myNew, cfg);
+  const myLineupAfter = lineupValue(myNew, cfg, boost);
   const myAfter = myLineupAfter.total;
   const theirAfter = lineupValue(theirNew, cfg).total;
   const myGain = myAfter - myBefore;
   const theirGain = theirAfter - theirBefore;
-  const accept = acceptance(theirBefore > 0 ? theirGain / theirBefore : 0, give, get, lean);
+  const accept = acceptance(theirBefore > 0 ? theirGain / theirBefore : 0, give, get, lean, tuning?.partnerPenalty?.[partnerId] ?? 0);
 
   const reasons: string[] = [];
   const posList = (ps: RankedPlayer[]) => Array.from(new Set(ps.map((p) => p.pos))).join("/");
@@ -231,11 +237,13 @@ export interface Partner {
 
 /** Search 1-for-1, 2-for-1, 1-for-2 and 2-for-2 trades with every partner; keep ones that help you and that
  *  they'd plausibly accept. */
-export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfig, opts = { perPartner: 2, total: 12 }, locked: Set<string> = new Set()): TradeEval[] {
+export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfig, opts = { perPartner: 2, total: 12 }, locked: Set<string> = new Set(), tuning?: TradeTuning): TradeEval[] {
+  const minGain = tuning?.minGainPct ?? DEFAULT_MIN_GAIN;
+  const minAccept = tuning?.minAccept ?? DEFAULT_MIN_ACCEPT;
   // Locked players (e.g. on a 1-week trade) still count in lineups but are never offered or asked for
   const top = (r: Valued[], n: number) => [...r].filter((x) => !locked.has(x.p.id)).sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.p);
   const myCands = top(mine, 8);
-  const myBefore = lineupValue(mine, cfg).total;
+  const myBefore = lineupValue(mine, cfg, tuning?.depthBoost ?? 1).total;
   const out: TradeEval[] = [];
   for (const partner of partners) {
     const theirCands = top(partner.roster, 8);
@@ -245,10 +253,10 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
     for (const [gk, rk] of [[1, 1], [2, 1], [1, 2], [2, 2]] as const) {
       for (const give of combos(myCands, gk)) {
         for (const get of combos(theirCands, rk)) {
-          const t = evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false);
+          const t = evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false, tuning);
           // Must clearly help you, must not meaningfully hurt them, and must be plausible
-          if (t.myGain / Math.max(myBefore, 1) < 0.004) continue;
-          if (t.theirGain / Math.max(theirBefore, 1) < -0.005 || t.accept < 0.35) continue;
+          if (t.myGain / Math.max(myBefore, 1) < minGain) continue;
+          if (t.theirGain / Math.max(theirBefore, 1) < -0.005 || t.accept < minAccept) continue;
           found.push(t);
         }
       }
@@ -262,6 +270,8 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
       const gKey = t.give.map((p) => p.id).sort().join(",");
       const rKey = t.get.map((p) => p.id).sort().join(",");
       if (seenGive.has(gKey) || seenGet.has(rKey)) continue;
+      // You asked not to see trades that leave you short at a position
+      if (tuning?.hideThin && depthReport(t.rosterBefore, t.rosterAfter, cfg).warnings.length) continue;
       seenGive.add(gKey);
       seenGet.add(rKey);
       out.push(t);
@@ -301,19 +311,19 @@ const ids = (ps: RankedPlayer[]) => ps.map((p) => p.id).sort().join(",");
  * top players for the target alone or the target plus one of theirs. Ranked by the chance they say yes and how
  * little it costs your lineup. If nothing is realistic, the closest long shots come back so you see the gap.
  */
-export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Partner, cfg: LeagueConfig, limit = 4, locked: Set<string> = new Set()): TradeEval[] {
+export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Partner, cfg: LeagueConfig, limit = 4, locked: Set<string> = new Set(), tuning?: TradeTuning): TradeEval[] {
   if (locked.has(target.id)) return [];
   const top = (r: Valued[], n: number) => [...r].filter((x) => !locked.has(x.p.id)).sort((a, b) => b.v - a.v).slice(0, n).map((x) => x.p);
   const myCands = top(mine, 10);
   const extras = top(partner.roster.filter((x) => x.p.id !== target.id), 6);
   const gets: RankedPlayer[][] = [[target], ...extras.map((p) => [target, p])];
   const gives = [...combos(myCands, 1), ...combos(myCands, 2)];
-  const before = { mine: lineupValue(mine, cfg).total, theirs: lineupValue(partner.roster, cfg).total };
+  const before = { mine: lineupValue(mine, cfg, tuning?.depthBoost ?? 1).total, theirs: lineupValue(partner.roster, cfg).total };
   const all: TradeEval[] = [];
   for (const get of gets) for (const give of gives) {
     // Don't ask for an extra player of theirs unless you're sending two back
     if (get.length > give.length) continue;
-    all.push(evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false));
+    all.push(evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false, tuning));
   }
   const score = (t: TradeEval) => t.accept + 6 * (t.myGain / Math.max(before.mine, 1));
   const realistic = all.filter((t) => t.accept >= 0.4).sort((a, b) => score(b) - score(a));
@@ -322,16 +332,16 @@ export function findTradesFor(target: RankedPlayer, mine: Valued[], partner: Par
 }
 
 /** "Shop my player": the best realistic return for `player` from every other team. */
-export function shopPlayer(player: RankedPlayer, mine: Valued[], partners: Partner[], cfg: LeagueConfig, limit = 4, locked: Set<string> = new Set()): TradeEval[] {
+export function shopPlayer(player: RankedPlayer, mine: Valued[], partners: Partner[], cfg: LeagueConfig, limit = 4, locked: Set<string> = new Set(), tuning?: TradeTuning): TradeEval[] {
   if (locked.has(player.id)) return [];
-  const myBefore = lineupValue(mine, cfg).total;
+  const myBefore = lineupValue(mine, cfg, tuning?.depthBoost ?? 1).total;
   const out: TradeEval[] = [];
   for (const partner of partners) {
     const theirs = [...partner.roster].filter((x) => !locked.has(x.p.id)).sort((a, b) => b.v - a.v).slice(0, 8).map((x) => x.p);
     const before = { mine: myBefore, theirs: lineupValue(partner.roster, cfg).total };
     let best: TradeEval | null = null;
     for (const get of [...combos(theirs, 1), ...combos(theirs, 2)]) {
-      const t = evaluateTrade(mine, partner.roster, [player], get, cfg, partner.id, partner.lean, before, false);
+      const t = evaluateTrade(mine, partner.roster, [player], get, cfg, partner.id, partner.lean, before, false, tuning);
       if (t.myGain <= 0 || t.accept < 0.4) continue;
       if (!best || t.myGain * t.accept > best.myGain * best.accept) best = t;
     }

@@ -9,7 +9,9 @@ import { type Horizon, type Partner, type TradeEval as BaseTrade, type Valued, f
 import type { ImportedLeague, LeagueConfig, Pos, RankedPlayer } from "@/lib/types";
 import { POSITIONS } from "@/lib/types";
 import { IconLock, IconUnlock } from "./icons";
-import { TradeCard } from "./TradeAssistant";
+import { TradeCard, tradeKey } from "./TradeAssistant";
+import { applyTradeRating, reportTradeRating } from "./RateTrade";
+import type { Rating } from "@/lib/tradeTuning";
 import { type LeagueTeam, useLeagueTeams } from "./useLeagueTeams";
 import { HorizonToggle, horizonLabel as labelFor } from "./Waivers";
 import { Flags, PosBadge, fmt, thumb } from "./ui";
@@ -81,8 +83,8 @@ function PlayerRow({ slot, x, dim, selected, onClick, rosRank, keeper, locked }:
 }
 
 /** Actions for a clicked player: trade for them (or a 1-week trade), or shop your own player. */
-function PlayerActions({ cfg, player, owner, isMine, weekTrades, weeksLeft, onOpenEditor, ideas, isLocked, onToggleLock, tradesOpen }: {
-  cfg: LeagueConfig; player: RankedPlayer; owner: LeagueTeam; isMine: boolean; weekTrades: boolean; weeksLeft: number; onOpenEditor: () => void;
+function PlayerActions({ onRate, cfg, player, owner, isMine, weekTrades, weeksLeft, onOpenEditor, ideas, isLocked, onToggleLock, tradesOpen }: {
+  onRate: (t: TradeEval, r: Rating) => void; cfg: LeagueConfig; player: RankedPlayer; owner: LeagueTeam; isMine: boolean; weekTrades: boolean; weeksLeft: number; onOpenEditor: () => void;
   ideas: (mode: Mode) => TradeEval[]; isLocked: boolean; onToggleLock: () => void; tradesOpen: boolean;
 }) {
   const [mode, setMode] = useState<Mode | null>(null);
@@ -131,7 +133,7 @@ function PlayerActions({ cfg, player, owner, isMine, weekTrades, weeksLeft, onOp
             {longShot && <p className="text-xs text-amber-300">Nothing here is likely to be accepted. These are the closest offers, so you can see the gap.</p>}
             <div className="grid gap-3 md:grid-cols-2">
               {results.map((t, i) => (
-                <TradeCard key={i} t={t} cfg={cfg} partnerName={mode === "shop" ? (t.partnerName ?? "Team") : owner.name}
+                <TradeCard key={tradeKey(t)} t={t} cfg={cfg} onRate={(r) => onRate(t, r)} partnerName={mode === "shop" ? (t.partnerName ?? "Team") : owner.name}
                   note={mode === "week" ? "1-week trade: values are this week's projected points, and everyone goes back after the week." : undefined} />
               ))}
             </div>
@@ -183,13 +185,13 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
       const asPartner = (t: LeagueTeam): Partner => ({ id: t.id, name: t.name, roster: t.roster, lean: leans.get(t.id) });
       if (mode === "shop") {
         const names = new Map(pool.map((t) => [t.id, t.name]));
-        return shopPlayer(player, mine.roster, pool.filter((t) => t.id !== myManager && t.roster.length).map(asPartner), cfg, 4, locked)
+        return shopPlayer(player, mine.roster, pool.filter((t) => t.id !== myManager && t.roster.length).map(asPartner), cfg, 4, locked, league.rules?.tradeTuning)
           .map((t) => ({ ...t, partnerName: names.get(t.partnerId) }));
       }
       const owner = pool.find((t) => t.id === viewing.id);
-      return owner ? findTradesFor(player, mine.roster, asPartner(owner), cfg, 4, locked) : [];
+      return owner ? findTradesFor(player, mine.roster, asPartner(owner), cfg, 4, locked, league.rules?.tradeTuning) : [];
     };
-  }, [teams, weekTeams, myManager, viewing, leans, cfg, locked]);
+  }, [teams, weekTeams, myManager, viewing, leans, cfg, locked, league.rules?.tradeTuning]);
 
   if (!me || !viewing || !view) return null;
 
@@ -222,7 +224,8 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
       <PlayerRow slot={slot} x={x} dim={dim} selected={!!x && selected === x.p.id} rosRank={x ? rosRanks.get(x.p.id) : undefined} keeper={keeper} locked={!!x && locked.has(x.p.id)}
         onClick={x ? () => setSelected(selected === x.p.id ? null : x.p.id) : undefined} />
       {x && selected === x.p.id && (
-        <PlayerActions key={`${viewing.id}-${x.p.id}`} cfg={cfg} player={x.p} owner={viewing} isMine={isMine}
+        <PlayerActions key={`${viewing.id}-${x.p.id}`} cfg={cfg} player={x.p}
+          onRate={(t, r) => { onLeagueEdit(applyTradeRating(league, t, r)); reportTradeRating(t, r, league.provider); }} owner={viewing} isMine={isMine}
           weekTrades={!!league.rules?.weekTrades} weeksLeft={weeksLeft} onOpenEditor={onOpenEditor}
           isLocked={locked.has(x.p.id)} onToggleLock={() => onLeagueEdit(toggleLock(league, x.p.id))} tradesOpen={tradesOpen}
           ideas={(m) => ideas(m, x.p)} />
