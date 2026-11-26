@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { BoardData, ImportedLeague, LeagueConfig, Toggles, TrendData } from "@/lib/types";
 import { applyToggles, computeBoard, defaultToggles, sameToggles } from "@/lib/engine";
 import { buildLeaguemateBots } from "@/lib/leaguemates";
@@ -10,10 +10,11 @@ import { seasonPhase } from "@/lib/phase";
 import { keepRosterEdits, keeperOn } from "@/lib/rosters";
 import AccountButton from "./AccountButton";
 import Glide from "./Glide";
+import { type SwipeTarget, useSwipePages } from "./useSwipePages";
 import BigBoard from "./BigBoard";
 import HelpPanel, { HelpButton } from "./HelpPanel";
 import LeagueEditor from "./LeagueEditor";
-import { MAIN_HELP } from "@/lib/help";
+import { LEAGUE_GROUPS, MAIN_HELP } from "@/lib/help";
 import FeedbackButton from "./Feedback";
 import KeeperCalc from "./KeeperCalc";
 import LiveDraft from "./LiveDraft";
@@ -239,20 +240,53 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
     ...(cfg.scoring.te_premium ? [`TE +${cfg.scoring.te_premium}`] : []),
   ];
 
+  // Which way the last page change went, so the new page slides in from that side (0 = just fade)
+  const [dir, setDir] = useState<-1 | 0 | 1>(0);
   const go = (t: Tab) => {
+    const from = tabs.findIndex((x) => x.id === tab);
+    const to = tabs.findIndex((x) => x.id === t);
+    setDir(from < 0 || to < 0 || to === from ? 0 : to > from ? 1 : -1);
     setTab(t);
     if (t !== tab) writeNav(t); // re-tapping the open tab keeps its tool in the URL
     window.scrollTo({ top: 0, behavior: "instant" });
   };
+  // Phones: swipe sideways to the next / previous page. In My League that walks through its tools first.
+  const leagueSwipe = useRef<SwipeTarget | null>(null);
+  useSwipePages(() => {
+    const i = tabs.findIndex((x) => x.id === tab);
+    const inLeague = (d: 1 | -1) => tab === "trades" && !!leagueSwipe.current?.can(d);
+    return {
+      can: (d) => inLeague(d) || !!tabs[i + d],
+      go: (d) => {
+        if (inLeague(d)) { leagueSwipe.current!.go(d); return; }
+        const next = tabs[i + d]?.id;
+        if (!next) return;
+        go(next);
+        // Swiping into My League lands on its first tool from the left, its last tool from the right
+        if (next === "trades") { const ids = LEAGUE_GROUPS.flatMap((g) => g.ids); writeNav("trades", d > 0 ? ids[0] : ids[ids.length - 1], true); }
+      },
+    };
+  });
+  // First visit on a phone: a one-time hint that pages can be swiped
+  const [swipeHint, setSwipeHint] = useState(false);
+  useEffect(() => {
+    try {
+      if (window.innerWidth > 1023 || localStorage.getItem("redraft27.swipeHint")) return;
+      localStorage.setItem("redraft27.swipeHint", "1");
+    } catch { return; }
+    const show = setTimeout(() => setSwipeHint(true), 1200);
+    const hide = setTimeout(() => setSwipeHint(false), 5200);
+    return () => { clearTimeout(show); clearTimeout(hide); };
+  }, []);
   // Browser Back / Forward move between tabs instead of leaving the app
   useEffect(() => {
-    const onPop = () => setTab(readNav().tab ?? "board");
+    const onPop = () => { setDir(0); setTab(readNav().tab ?? "board"); };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   return (
-    <div className="min-h-screen text-slate-200">
+    <div className="min-h-screen overflow-x-clip text-slate-200">
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:gap-3">
           <Link href="/" aria-label="Home" className="shrink-0"><Logo className="h-8 w-8" /></Link>
@@ -290,7 +324,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         </div>
       </header>
 
-      <main key={tab} className="ff-view mx-auto max-w-7xl px-4 pb-28 pt-5 lg:pb-10">
+      <main key={tab} className={`${dir > 0 ? "ff-slide-next" : dir < 0 ? "ff-slide-prev" : "ff-view"} mx-auto max-w-7xl px-4 pb-28 pt-5 lg:pb-10`}>
         {tab === "board" && (
           <Welcome onImport={() => setSettingsOpen(true)} onMock={() => go("mock")} onLive={() => go("live")} onHelp={() => setHelpOpen(true)} />
         )}
@@ -299,7 +333,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
         {tab === "live" && <LiveDraft board={board} cfg={cfg} />}
         {tab === "trades" && (
           <LeagueHub board={board} cfg={cfg} league={league} myManager={myManager} leaguemates={leaguemates}
-            throughWeek={m.throughWeek} keeper={keeper} onOpenSettings={() => setSettingsOpen(true)}
+            throughWeek={m.throughWeek} keeper={keeper} onOpenSettings={() => setSettingsOpen(true)} swipeRef={leagueSwipe}
             onLeagueRefreshed={refreshLeague} onChooseManager={chooseManager} onOpenEditor={() => setEditorOpen(true)} onLeagueEdit={editLeague} />
         )}
         {tab === "keepers" && keeper && <KeeperCalc board={board} cfg={cfg} />}
@@ -325,16 +359,23 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
       {/* Phone / tablet: app-style bottom tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-800 bg-slate-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Sections">
-        <div className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+        <Glide pill="rounded-2xl bg-emerald-500/10" className="mx-auto grid max-w-lg px-1 py-1" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
           {tabs.map(({ id, short, icon: Icon }) => (
-            <button key={id} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined}
+            <button key={id} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined} data-active={tab === id}
               className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${tab === id ? "text-emerald-400" : "text-slate-500"}`}>
               <Icon className={`h-5 w-5 transition-transform duration-300 ease-[var(--ease-glide)] ${tab === id ? "scale-110" : ""}`} />
               {short}
             </button>
           ))}
-        </div>
+        </Glide>
       </nav>
+      {swipeHint && (
+        <div aria-live="polite" className="ff-pop pointer-events-none fixed inset-x-0 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 flex justify-center lg:hidden">
+          <span className="rounded-full bg-slate-800/95 px-4 py-2 text-xs font-semibold text-slate-200 shadow-lg ring-1 ring-slate-700">
+            Tip: swipe left or right to switch pages
+          </span>
+        </div>
+      )}
 
       <FeedbackButton context={{ tab, league: league ? league.provider : "none" }} />
       <SettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} toggles={toggles} defaults={defaults}

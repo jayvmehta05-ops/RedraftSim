@@ -9,6 +9,7 @@ import { readNav, writeNav } from "@/lib/nav";
 import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import Glide from "./Glide";
+import type { SwipeTarget } from "./useSwipePages";
 import LuckMeter from "./LuckMeter";
 import MyTeam from "./MyTeam";
 import PlayoffOdds from "./PlayoffOdds";
@@ -61,6 +62,8 @@ export default function LeagueHub(props: {
   onLeagueRefreshed: (l: ImportedLeague) => void; onChooseManager: (id: string | null) => void; onOpenEditor: () => void;
   /** save a hand edit to the league (e.g. locking a player) */
   onLeagueEdit: (l: ImportedLeague) => void;
+  /** lets the app's phone swipe step through these tools before moving to the next tab */
+  swipeRef?: React.RefObject<SwipeTarget | null>;
 }) {
   // Open on what matters for this point in the season: lineups once trading is over, rosters before that
   // A link or refresh (/app#league/odds) opens that tool; otherwise what matters for this point in the season
@@ -70,11 +73,25 @@ export default function LeagueHub(props: {
     const p = seasonPhase(props.throughWeek, props.league, 0);
     return p.phase === "playoffs" || (p.phase === "stretch" && !p.tradesOpen) ? "startsit" : "team";
   });
-  const setSection = (s: Section) => { setSectionState(s); writeNav("trades", s); };
+  const [secDir, setSecDir] = useState<-1 | 0 | 1>(0); // slide direction for the next tool's entrance
+  const ORDER = LEAGUE_GROUPS.flatMap((g) => g.ids); // left-to-right order, as the picker shows them
+  const setSection = (s: Section) => {
+    const a = ORDER.indexOf(section), b = ORDER.indexOf(s);
+    setSecDir(a === b ? 0 : b > a ? 1 : -1);
+    setSectionState(s);
+    writeNav("trades", s);
+  };
+  const { swipeRef } = props;
+  useEffect(() => {
+    if (!swipeRef) return;
+    const i = ORDER.indexOf(section);
+    swipeRef.current = { can: (d) => !!ORDER[i + d], go: (d) => { if (ORDER[i + d]) setSection(ORDER[i + d]); } };
+    return () => { swipeRef.current = null; };
+  });
   // Keep the URL showing the open tool, and follow Back / Forward between tools
   useEffect(() => {
     writeNav("trades", section, true);
-    const onPop = () => { const n = readNav(); if (n.tab === "trades" && n.section) setSectionState(n.section); };
+    const onPop = () => { const n = readNav(); if (n.tab === "trades" && n.section) { setSecDir(0); setSectionState(n.section); } };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -167,7 +184,7 @@ export default function LeagueHub(props: {
           </div>
         ))}
       </Glide>
-      <div key={section} className="ff-view space-y-4">
+      <div key={section} data-swipe-surface className={`${secDir > 0 ? "ff-slide-next" : secDir < 0 ? "ff-slide-prev" : "ff-view"} space-y-4`}>
       <p className="-mt-1 text-sm text-slate-300"><b className="text-white">{LEAGUE_HELP[section].name}:</b> {LEAGUE_HELP[section].what}</p>
       {league && !offseason && (
         <div className="flex items-start gap-3 rounded-xl bg-gradient-to-r from-emerald-500/10 to-transparent px-4 py-3 ring-1 ring-emerald-500/20">

@@ -282,7 +282,8 @@ export default function MockDraft({ board, cfg, leaguemates = [], myManager = nu
   const suggestedIds = new Set(suggestions.map((s) => s.player.id));
 
   return (
-    <section className="space-y-4">
+    // A sideways swipe mid-draft would leave the page and lose the draft, so phones don't page from here
+    <section className="space-y-4" data-noswipe-page={phase === "live" ? "" : undefined}>
       {/* status bar */}
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 ring-1 ring-slate-800">
         {phase === "live" ? (

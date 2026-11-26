@@ -64,6 +64,11 @@ button { touch-action: manipulation; }
 @keyframes ff-sheet-right { from { translate: 100% 0; } to { translate: none; } }
 @keyframes ff-pop { from { opacity: 0; translate: 0 16px; scale: 0.97; } to { opacity: 1; translate: none; scale: none; } }
 .ff-view { animation: ff-view 0.38s var(--ease-out) both; }
+/* Moving to the next / previous page: it slides in from the side you're heading to */
+@keyframes ff-from-right { from { opacity: 0; translate: min(30vw, 72px) 0; } to { opacity: 1; translate: none; } }
+@keyframes ff-from-left { from { opacity: 0; translate: max(-30vw, -72px) 0; } to { opacity: 1; translate: none; } }
+.ff-slide-next { animation: ff-from-right 0.42s var(--ease-out) both; }
+.ff-slide-prev { animation: ff-from-left 0.42s var(--ease-out) both; }
 .ff-fade { animation: ff-fade 0.25s ease-out both; }
 .ff-sheet-right { animation: ff-sheet-right 0.5s var(--ease-sheet) both; }
 .ff-pop { animation: ff-pop 0.36s var(--ease-out) both; }

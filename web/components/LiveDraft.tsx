@@ -107,7 +107,7 @@ export default function LiveDraft({ board, cfg }: { board: RankedPlayer[]; cfg: 
   }
 
   return (
-    <section className="space-y-4">
+    <section className="space-y-4" data-noswipe-page={draftId ? "" : undefined}>
       <div className="flex flex-wrap items-center gap-3 rounded-xl bg-slate-900 px-4 py-3 ring-1 ring-slate-800">
         <span className="text-sm text-white">Draft {draftId}</span>
         {draft && <span className="rounded-full bg-slate-800 px-2.5 py-1 text-xs text-slate-300">{draft.status.replace("_", " ")} · {teams} teams · {rounds} rounds</span>}
