@@ -48,6 +48,9 @@ def fetch(path: str, token: str):
 
 
 def main() -> int:
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")  # Windows consoles choke on emoji
+
     ap = argparse.ArgumentParser()
     ap.add_argument("--all", action="store_true", help="ignore the saved position and show the last 100")
     ap.add_argument("--json", action="store_true")
