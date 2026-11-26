@@ -6,6 +6,7 @@ import { Logo } from "@/components/icons";
 import Counters from "@/components/landing/Counters";
 import FeatureTour from "@/components/landing/FeatureTour";
 import HeroHeadline from "@/components/landing/HeroHeadline";
+import Reveal from "@/components/landing/Reveal";
 import TopCard, { type TopRow } from "@/components/landing/TopCard";
 import Waitlist from "@/components/landing/Waitlist";
 import { thumb } from "@/components/ui";
@@ -89,7 +90,7 @@ export default function Landing() {
             <div className="ff-float absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-fuchsia-500/10 blur-3xl" style={{ animationDelay: "-6s" }} />
           </div>
           <div className="relative mx-auto grid max-w-6xl items-center gap-10 px-4 pt-14 pb-14 md:grid-cols-[1.15fr_1fr] md:pt-20 md:pb-20">
-            <div>
+            <div className="ff-enter">
               {updated && (
                 <div className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-300 ring-1 ring-emerald-500/30">
                   <span className="relative flex h-2 w-2">
@@ -109,7 +110,7 @@ export default function Landing() {
               </div>
               <p className="mt-4 text-xs text-slate-500">Free. No ads. No account needed. Sign in only to sync your leagues across devices.</p>
             </div>
-            <TopCard lists={lists} target={TARGET} />
+            <div className="ff-enter" style={{ "--enter-delay": "180ms" } as React.CSSProperties}><TopCard lists={lists} target={TARGET} /></div>
           </div>
         </section>
 
@@ -134,7 +135,7 @@ export default function Landing() {
         )}
 
         {/* Counters */}
-        <section className="mx-auto max-w-6xl px-4 pt-14">
+        <section data-reveal className="mx-auto max-w-6xl px-4 pt-14">
           <Counters items={[
             { value: board.players.length, label: `players projected for ${TARGET}` },
             { value: m.throughWeek, label: `weeks of ${SOURCE} games in the model` },
@@ -146,9 +147,11 @@ export default function Landing() {
         {/* Feature tour */}
         <section id="tour" className="scroll-mt-20">
           <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Everything for your league, in one place</h2>
-            <p className="mt-2 max-w-2xl text-slate-400">Most sites wake up for next season in August. This one keeps your plan current all year. Click around:</p>
-            <div className="mt-10">
+            <div data-reveal>
+              <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Everything for your league, in one place</h2>
+              <p className="mt-2 max-w-2xl text-slate-400">Most sites wake up for next season in August. This one keeps your plan current all year. Click around:</p>
+            </div>
+            <div data-reveal className="mt-10" style={{ "--reveal-delay": "120ms" } as React.CSSProperties}>
               <FeatureTour names={names} target={TARGET} source={SOURCE} />
             </div>
           </div>
@@ -157,11 +160,11 @@ export default function Landing() {
         {/* How it works */}
         <section className="border-t border-slate-800/70">
           <div className="mx-auto max-w-6xl px-4 py-16 md:py-20">
-            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Three steps to your league&apos;s board</h2>
+            <h2 data-reveal className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Three steps to your league&apos;s board</h2>
             <div className="relative mt-10 grid gap-6 md:grid-cols-3">
               <div aria-hidden className="absolute top-[18px] right-[16%] left-[16%] hidden h-px bg-gradient-to-r from-emerald-500/0 via-emerald-500/50 to-emerald-500/0 md:block" />
-              {STEPS.map((s) => (
-                <div key={s.n} className="group relative flex gap-4 md:flex-col md:items-center md:text-center">
+              {STEPS.map((s, i) => (
+                <div key={s.n} data-reveal style={{ "--reveal-delay": `${i * 120}ms` } as React.CSSProperties} className="group relative flex gap-4 md:flex-col md:items-center md:text-center">
                   <span className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-sm font-black text-slate-950 transition group-hover:scale-110">
                     <span aria-hidden className="absolute inset-0 animate-ping rounded-full bg-emerald-400/40 [animation-duration:2.4s]" />
                     <span className="relative">{s.n}</span>
@@ -173,13 +176,13 @@ export default function Landing() {
                 </div>
               ))}
             </div>
-            <div className="mt-12 grid gap-3 sm:grid-cols-3">
+            <div data-reveal className="mt-12 grid gap-3 sm:grid-cols-3">
               {[
                 ["Tested on past seasons", "Accuracy is published, good and bad.", "/accuracy"],
                 ["Not gambling", "A planning tool for season-long leagues. No bets, no odds.", "/terms"],
                 ["Your data stays yours", "Each account sees only its own leagues. ESPN logins never leave your device.", "/privacy"],
               ].map(([t, b, href]) => (
-                <Link key={t} href={href} className="rounded-xl bg-slate-900/50 p-4 ring-1 ring-slate-800 transition hover:-translate-y-0.5 hover:ring-emerald-500/40">
+                <Link key={t} href={href} className="block rounded-xl bg-slate-900/50 p-4 ring-1 ring-slate-800 transition duration-300 hover:-translate-y-0.5 hover:ring-emerald-500/40">
                   <div className="text-sm font-semibold text-white">{t}</div>
                   <div className="mt-1 text-xs leading-relaxed text-slate-400">{b}</div>
                 </Link>
@@ -191,7 +194,7 @@ export default function Landing() {
         {/* Waitlist */}
         <section id="waitlist" className="relative scroll-mt-20 overflow-hidden border-t border-slate-800/70">
           <div aria-hidden className="ff-float-2 pointer-events-none absolute -right-24 top-10 h-72 w-72 rounded-full bg-cyan-500/10 blur-3xl" />
-          <div className="relative mx-auto max-w-4xl px-4 py-16 text-center md:py-20">
+          <div data-reveal className="relative mx-auto max-w-4xl px-4 py-16 text-center md:py-20">
             <div className="inline-flex items-center gap-2 rounded-full bg-cyan-500/10 px-3 py-1 text-xs font-semibold text-cyan-300 ring-1 ring-cyan-500/30">
               <span className="ff-blink h-1.5 w-1.5 rounded-full bg-cyan-300" /> Coming next
             </div>
@@ -217,13 +220,13 @@ export default function Landing() {
         {/* Good to know */}
         <section id="faq" className="scroll-mt-20 border-t border-slate-800/70">
           <div className="mx-auto max-w-3xl px-4 py-16 md:py-20">
-            <h2 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Good to know</h2>
+            <h2 data-reveal className="text-2xl font-bold tracking-tight text-white sm:text-3xl">Good to know</h2>
             <div className="mt-8 space-y-2">
-              {FAQ.map(([q, a]) => (
-                <details key={q} className="group rounded-xl bg-slate-900/60 ring-1 ring-slate-800 open:ring-emerald-500/30">
+              {FAQ.map(([q, a], i) => (
+                <details key={q} data-reveal style={{ "--reveal-delay": `${Math.min(i, 4) * 60}ms` } as React.CSSProperties} className="group rounded-xl bg-slate-900/60 ring-1 ring-slate-800 open:ring-emerald-500/30">
                   <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 font-semibold text-white">
                     <span className="flex-1">{q}</span>
-                    <span aria-hidden className="text-emerald-400 transition group-open:rotate-45">+</span>
+                    <span aria-hidden className="text-emerald-400 transition duration-300 group-open:rotate-45">+</span>
                   </summary>
                   <p className="px-4 pb-4 text-sm leading-relaxed text-slate-400">{a}</p>
                 </details>
@@ -235,7 +238,7 @@ export default function Landing() {
         {/* Final call to action */}
         <section className="relative overflow-hidden border-t border-slate-800/70">
           <div aria-hidden className="ff-float pointer-events-none absolute top-0 left-1/2 h-72 w-[36rem] -translate-x-1/2 rounded-full bg-emerald-500/15 blur-3xl" />
-          <div className="relative mx-auto max-w-6xl px-4 py-20 text-center">
+          <div data-reveal className="relative mx-auto max-w-6xl px-4 py-20 text-center">
             <h2 className="text-3xl font-black tracking-tight text-white sm:text-4xl">Get a head start on {TARGET}</h2>
             <p className="mx-auto mt-3 max-w-lg text-slate-400">Import your league in under a minute and see where your team stands.</p>
             <ContinueButton newLabel="Open the app"
@@ -243,6 +246,7 @@ export default function Landing() {
           </div>
         </section>
       </main>
+      <Reveal />
 
       <footer className="border-t border-slate-800/70">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-6 text-xs text-slate-500">

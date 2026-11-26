@@ -3,6 +3,9 @@
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  /* every `transition` utility eases out softly instead of the default linear-ish 150ms */
+  --default-transition-duration: 220ms;
+  --default-transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 :root {
@@ -65,12 +68,41 @@ button { touch-action: manipulation; }
 .ff-sheet-right { animation: ff-sheet-right 0.5s var(--ease-sheet) both; }
 .ff-pop { animation: ff-pop 0.36s var(--ease-out) both; }
 
+/* Scroll reveal (components/landing/Reveal.tsx): only hides things once the script is running */
+.ff-reveal-on [data-reveal][data-shown] {
+  transition: opacity 0.9s var(--ease-out), translate 0.9s var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+}
+.ff-reveal-on [data-reveal]:not([data-shown]) { opacity: 0; translate: 0 28px; }
+
+/* Page-load entrance for the hero, in a soft sequence */
+@keyframes ff-enter { from { opacity: 0; translate: 0 18px; } to { opacity: 1; translate: none; } }
+.ff-enter { animation: ff-enter 0.9s var(--ease-out) both; animation-delay: var(--enter-delay, 0ms); }
+
+/* FAQ answers open and close smoothly where the browser supports animating to "auto" */
+@supports (interpolate-size: allow-keywords) {
+  :root { interpolate-size: allow-keywords; }
+  details::details-content {
+    block-size: 0;
+    overflow: clip;
+    opacity: 0;
+    transition: block-size 0.4s var(--ease-out), opacity 0.3s ease, content-visibility 0.4s allow-discrete;
+  }
+  details[open]::details-content { block-size: auto; opacity: 1; }
+}
+
+/* Big blurred glows move on the GPU so scrolling stays smooth on phones */
+.ff-float, .ff-float-2, .ff-spin-slow, .ff-marquee { will-change: transform; }
+
 /* Selection pill that glides between options (components/Glide.tsx) */
 .ff-glide { position: relative; isolation: isolate; }
 .ff-glide-pill { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; }
 .ff-glide button { position: relative; z-index: 1; }
 
 @media (prefers-reduced-motion: reduce) {
+  .ff-reveal-on [data-reveal]:not([data-shown]) { opacity: 1; translate: none; }
+  [data-reveal] { transition: none; }
+  details::details-content { transition: none !important; }
   button:not(:disabled):active, a[class*="rounded"]:active, summary:active { scale: none; }
   .ff-glide-pill { transition: none !important; }
 }

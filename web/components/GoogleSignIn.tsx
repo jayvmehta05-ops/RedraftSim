@@ -47,6 +47,7 @@ export default function GoogleSignIn({ sb, fallback }: { sb: SupabaseClient; fal
   const ref = useRef<HTMLDivElement>(null);
   const [failed, setFailed] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [shown, setShown] = useState(false); // fades Google's button in once it has drawn
 
   useEffect(() => {
     let cancelled = false;
@@ -73,10 +74,13 @@ export default function GoogleSignIn({ sb, fallback }: { sb: SupabaseClient; fal
           }
         },
       });
+      // Dark button to match the site (Google's "outline" theme is a white pill)
       g.renderButton(ref.current, {
         type: window.innerWidth < 640 ? "icon" : "standard",
-        theme: "outline", size: "medium", shape: "pill", text: "signin", logo_alignment: "left",
+        theme: "filled_black", size: "medium", shape: "pill", text: "signin", logo_alignment: "left",
       });
+      // Reveal after Google's frame has had a moment to paint, so it fades in instead of popping
+      setTimeout(() => { if (!cancelled) setShown(true); }, 150);
     })().catch((e) => {
       if (cancelled) return;
       reportError(e, "google sign-in button");
@@ -87,8 +91,11 @@ export default function GoogleSignIn({ sb, fallback }: { sb: SupabaseClient; fal
 
   if (failed) return <>{fallback}</>;
   return (
-    <div className="flex min-h-8 items-center" aria-busy={busy}>
-      {busy ? <span className="text-xs text-slate-400">Signing in…</span> : <div ref={ref} />}
+    // color-scheme: light stops the browser from painting an opaque white box behind Google's frame
+    // (a page in dark mode makes cross-site frames opaque unless their color schemes match)
+    <div className="flex min-h-8 items-center [color-scheme:light]" aria-busy={busy}>
+      {busy ? <span className="text-xs text-slate-400 [color-scheme:dark]">Signing in…</span>
+        : <div ref={ref} className={`transition-opacity duration-500 ${shown ? "opacity-100" : "opacity-0"}`} />}
     </div>
   );
 }
