@@ -23,14 +23,15 @@ import TrendTracker from "./TrendTracker";
 import Welcome from "./Welcome";
 import { IconBoard, IconKeeper, IconLive, IconMock, IconSettings, IconSwap, IconTrend, Logo } from "./icons";
 import { TARGET } from "@/lib/season";
+import { readNav, writeNav } from "@/lib/nav";
 
 const TABS = [
-  { id: "board", label: `${TARGET} Big Board`, short: "Board", icon: IconBoard },
-  { id: "mock", label: "Mock Draft", short: "Mock", icon: IconMock },
-  { id: "live", label: "Live Draft", short: "Live", icon: IconLive },
-  { id: "trades", label: "My League", short: "League", icon: IconSwap },
-  { id: "keepers", label: "Keepers", short: "Keepers", icon: IconKeeper },
-  { id: "trends", label: "Trends", short: "Trends", icon: IconTrend },
+  { id: "board", label: `${TARGET} Big Board`, mid: "Big Board", short: "Board", icon: IconBoard },
+  { id: "mock", label: "Mock Draft", mid: "Mock Draft", short: "Mock", icon: IconMock },
+  { id: "live", label: "Live Draft", mid: "Live Draft", short: "Live", icon: IconLive },
+  { id: "trades", label: "My League", mid: "My League", short: "League", icon: IconSwap },
+  { id: "keepers", label: "Keepers", mid: "Keepers", short: "Keepers", icon: IconKeeper },
+  { id: "trends", label: "Trends", mid: "Trends", short: "Trends", icon: IconTrend },
 ] as const;
 type Tab = (typeof TABS)[number]["id"];
 const STORAGE_KEY = "redraft27.toggles";
@@ -110,10 +111,14 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       setSavedLeagues(all);
       setMyManagers(mys);
       setAllOverrides(JSON.parse(localStorage.getItem(PROFILES_KEY) ?? "{}"));
-      setSiteKeeper(localStorage.getItem(KEEPER_KEY) === "1");
-      // During the season, people with a league come back for their league: open there
+      const storedKeeper = localStorage.getItem(KEEPER_KEY) === "1";
+      setSiteKeeper(storedKeeper);
+      // A link or refresh (/app#league/odds) opens where it points; otherwise, during the season,
+      // people with a league come back for their league: open there
+      const nav = readNav();
       const p = seasonPhase(data.meta.throughWeek, active, 0).phase;
-      if (active && me && p !== "preseason" && p !== "offseason") setTab("trades");
+      if (nav.tab && (nav.tab !== "keepers" || keeperOn(active, storedKeeper))) setTab(nav.tab);
+      else if (active && me && p !== "preseason" && p !== "offseason") { setTab("trades"); writeNav("trades", null, true); }
     } catch {
       /* storage unavailable */
     }
@@ -235,16 +240,23 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
   const go = (t: Tab) => {
     setTab(t);
+    writeNav(t);
     window.scrollTo({ top: 0 });
   };
+  // Browser Back / Forward move between tabs instead of leaving the app
+  useEffect(() => {
+    const onPop = () => setTab(readNav().tab ?? "board");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   return (
     <div className="min-h-screen text-slate-200">
       <header className="sticky top-0 z-30 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-md">
-        <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3">
+        <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:gap-3">
           <Link href="/" aria-label="Home" className="shrink-0"><Logo className="h-8 w-8" /></Link>
           <div className="min-w-0">
-            <h1 className="truncate text-base font-bold leading-tight tracking-tight text-white sm:text-lg">
+            <h1 className="truncate text-[15px] font-bold leading-tight tracking-tight text-white sm:text-lg">
               Future <span className="text-emerald-400">Fantasy</span><span className="ml-2 hidden rounded-md bg-emerald-500/10 px-1.5 py-0.5 align-middle text-[11px] font-semibold text-emerald-300 ring-1 ring-emerald-500/30 sm:inline">{TARGET} board</span>
             </h1>
             <p className="truncate text-[11px] text-slate-500">
@@ -254,8 +266,8 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           <nav className="ml-4 hidden items-center gap-1 lg:flex" aria-label="Sections">
             {tabs.map((t) => (
               <button key={t.id} onClick={() => go(t.id)} aria-current={tab === t.id ? "page" : undefined} title={MAIN_HELP[t.id].what}
-                className={`rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
-                {t.label}
+                className={`whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold transition ${tab === t.id ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-900 hover:text-white"}`}>
+                <span className="xl:hidden">{t.mid}</span><span className="hidden xl:inline">{t.label}</span>
               </button>
             ))}
           </nav>
@@ -265,7 +277,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
           <button onClick={() => setSettingsOpen(true)}
             className={`flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold ring-1 transition ${nonDefault || league ? "bg-emerald-500/10 text-emerald-300 ring-emerald-500/40 hover:bg-emerald-500/20" : "bg-slate-900 text-slate-200 ring-slate-700 hover:bg-slate-800"}`}>
             <IconSettings className="h-4 w-4" />
-            <span className="hidden sm:inline">{league ? "Your league" : "League settings"}</span>
+            {league ? <span className="hidden sm:inline">Your league</span> : <><span className="sm:hidden">Import</span><span className="hidden sm:inline">League settings</span></>}
           </button>
         </div>
         <div className="mx-auto max-w-7xl px-4 pb-2.5">
@@ -294,7 +306,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
       </main>
 
       <footer className="mx-auto max-w-7xl px-4 pb-28 text-[11px] leading-relaxed text-slate-600 lg:pb-8">
-        <div className="mb-2 flex gap-4 text-xs">
+        <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs">
           <a href="/about" className="text-emerald-400/80 hover:text-emerald-300">About</a>
           <a href="/guide" className="text-emerald-400/80 hover:text-emerald-300">How it works</a>
           <a href="/accuracy" className="text-emerald-400/80 hover:text-emerald-300">How accurate are these projections?</a>
@@ -312,7 +324,7 @@ export default function App({ data, trends, config: siteConfig }: { data: BoardD
 
       {/* Phone / tablet: app-style bottom tabs */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-800 bg-slate-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md lg:hidden" aria-label="Sections">
-        <div className="mx-auto grid max-w-lg grid-cols-6">
+        <div className="mx-auto grid max-w-lg" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
           {tabs.map(({ id, short, icon: Icon }) => (
             <button key={id} onClick={() => go(id)} aria-current={tab === id ? "page" : undefined}
               className={`flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold ${tab === id ? "text-emerald-400" : "text-slate-500"}`}>

@@ -5,6 +5,7 @@ import { type EspnAuth, fetchLatest, isStale, rememberEspnAuth, savedEspnAuth } 
 import type { LeaguemateProfile } from "@/lib/leaguemates";
 import { LEAGUE_GROUPS, LEAGUE_HELP } from "@/lib/help";
 import { seasonPhase } from "@/lib/phase";
+import { readNav, writeNav } from "@/lib/nav";
 import { SOURCE, TARGET } from "@/lib/season";
 import type { ImportedLeague, LeagueConfig, RankedPlayer } from "@/lib/types";
 import LuckMeter from "./LuckMeter";
@@ -61,10 +62,22 @@ export default function LeagueHub(props: {
   onLeagueEdit: (l: ImportedLeague) => void;
 }) {
   // Open on what matters for this point in the season: lineups once trading is over, rosters before that
-  const [section, setSection] = useState<Section>(() => {
+  // A link or refresh (/app#league/odds) opens that tool; otherwise what matters for this point in the season
+  const [section, setSectionState] = useState<Section>(() => {
+    const fromUrl = readNav().section;
+    if (fromUrl) return fromUrl;
     const p = seasonPhase(props.throughWeek, props.league, 0);
     return p.phase === "playoffs" || (p.phase === "stretch" && !p.tradesOpen) ? "startsit" : "team";
   });
+  const setSection = (s: Section) => { setSectionState(s); writeNav("trades", s); };
+  // Keep the URL showing the open tool, and follow Back / Forward between tools
+  useEffect(() => {
+    writeNav("trades", section, true);
+    const onPop = () => { const n = readNav(); if (n.tab === "trades" && n.section) setSectionState(n.section); };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const { league, myManager, onLeagueRefreshed } = props;
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -137,11 +150,12 @@ export default function LeagueHub(props: {
   return (
     <div className="space-y-4">
       {/* Tools grouped by what you're trying to do, with a plain description of the open one */}
-      <div className="no-scrollbar -mx-1 flex max-w-full gap-2 overflow-x-auto px-1 pb-1 [scrollbar-width:none]">
+      {/* Wraps onto more rows on narrow screens so every tool stays visible (no hidden sideways scroll) */}
+      <div className="flex flex-wrap gap-x-2 gap-y-2.5">
         {LEAGUE_GROUPS.map((g) => (
-          <div key={g.label} className="shrink-0">
+          <div key={g.label} className="max-w-full">
             <div className="mb-1 px-1 text-[10px] font-bold tracking-wider text-slate-500 uppercase">{g.label}</div>
-            <div className="flex rounded-xl bg-slate-900 p-1 ring-1 ring-slate-800">
+            <div className="flex flex-wrap rounded-xl bg-slate-900 p-1 ring-1 ring-slate-800">
               {g.ids.map((id) => (
                 <button key={id} onClick={() => setSection(id)} title={LEAGUE_HELP[id].what} aria-pressed={section === id}
                   className={`whitespace-nowrap rounded-lg px-3.5 py-2 text-sm font-semibold transition ${section === id ? "bg-emerald-500 text-slate-950" : "text-slate-400 hover:text-white"}`}>

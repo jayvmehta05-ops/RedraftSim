@@ -142,7 +142,7 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
 
   // ------------------------------------------------------------------ empty states
   if (!league) {
-    return <Empty error={refreshError} title="Trade assistant" body="Import your league to see trade ideas that improve your starting lineup and that your leaguemates would actually accept."
+    return <Empty error={refreshError} title="Import your league to unlock My League" body="Start/sit, waivers, trade ideas, power rankings, playoff odds and the luck meter all run on your league's real rosters and scoring. Paste a Sleeper or ESPN league ID, or set one up by hand."
       action={<button onClick={onOpenSettings} className="rounded-lg bg-emerald-500 px-4 py-2 text-sm font-bold text-slate-950">Import your league</button>} />;
   }
   if (!league.rosters) {
