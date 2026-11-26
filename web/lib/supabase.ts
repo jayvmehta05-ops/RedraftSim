@@ -16,6 +16,14 @@ const anon = (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NE
 
 export const accountsEnabled = Boolean(url && anon);
 
+/**
+ * Google OAuth web client used for "Sign in with Google" on the site itself (public, not a secret).
+ * Its Authorized JavaScript origins in Google Cloud must include every site address, and Supabase's
+ * Google provider lists it under Client IDs so it accepts the ID tokens.
+ */
+export const GOOGLE_CLIENT_ID = (process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+  || "84695227324-gckapssitkf9imjsfqbtl28jmf5f0ocp.apps.googleusercontent.com").trim();
+
 let client: SupabaseClient | null = null;
 export function supabase(): SupabaseClient | null {
   if (!accountsEnabled || typeof window === "undefined") return null;

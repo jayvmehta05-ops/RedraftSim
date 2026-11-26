@@ -5,6 +5,7 @@ import type { User } from "@supabase/supabase-js";
 import { accountsEnabled, supabase } from "@/lib/supabase";
 import { deleteCloudData, primeLastPushed, pullOnSignIn, pushChanges, reloadOnce, signOutAndWipe } from "@/lib/cloudSync";
 import { reportError } from "@/lib/report";
+import GoogleSignIn, { signOutOfGoogleButton } from "./GoogleSignIn";
 
 type Status = "idle" | "syncing" | "synced" | "error";
 const PUSH_EVERY_MS = 4000;
@@ -89,7 +90,8 @@ export default function AccountButton() {
   const sb = supabase();
 
   if (!user) {
-    return (
+    // Fallback: the redirect sign-in through Supabase (used only if Google's button can't load)
+    const redirectButton = (
       <button
         onClick={() => {
           sessionStorage.setItem(RETURN_KEY, window.location.pathname);
@@ -100,6 +102,7 @@ export default function AccountButton() {
         <GoogleG /><span className="hidden sm:inline">Sign in</span>
       </button>
     );
+    return sb ? <GoogleSignIn sb={sb} fallback={redirectButton} /> : redirectButton;
   }
 
   const name = (user.user_metadata?.full_name as string | undefined) ?? user.email ?? "Account";
@@ -126,6 +129,7 @@ export default function AccountButton() {
             <button
               onClick={async () => {
                 if (!sb) return;
+                signOutOfGoogleButton();
                 await signOutAndWipe(sb);
                 window.location.reload();
               }}
