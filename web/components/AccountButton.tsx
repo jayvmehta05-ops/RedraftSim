@@ -21,6 +21,8 @@ function GoogleG() {
 
 export default function AccountButton() {
   const [user, setUser] = useState<User | null>(null);
+  // false until Supabase reports the saved session (or none), so signed-in visitors never see "Sign in" flash
+  const [authReady, setAuthReady] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [open, setOpen] = useState(false);
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -72,6 +74,7 @@ export default function AccountButton() {
     };
 
     const { data: sub } = sb.auth.onAuthStateChange((event, session) => {
+      if (event === "INITIAL_SESSION") setAuthReady(true);
       if ((event === "INITIAL_SESSION" || event === "SIGNED_IN") && session?.user) {
         void onSession(session.user);
       } else if (event === "SIGNED_OUT") {
@@ -89,6 +92,7 @@ export default function AccountButton() {
   if (!accountsEnabled) return null;
   const sb = supabase();
 
+  if (!user && !authReady) return <div className="h-8 w-8" aria-hidden />;
   if (!user) {
     // Fallback: the redirect sign-in through Supabase (used only if Google's button can't load)
     const redirectButton = (
