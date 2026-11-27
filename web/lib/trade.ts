@@ -191,10 +191,11 @@ function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlaye
   const nameW = lean?.nameValue ?? 1;
   // Star premium: managers rarely give up the best player in a deal unless a comparable one comes back
   const best = (ps: RankedPlayer[]) => ps.reduce((m, p) => Math.max(m, marketValue(p)), 0);
-  const star = Math.max(0, best(get) - best(give)) / 40 * (0.6 + 0.4 * nameW);
+  // (small gaps don't count: a slightly better player for two solid ones is a normal 2-for-1)
+  const star = Math.max(0, best(get) - best(give) - 15) / 45 * (0.6 + 0.4 * nameW);
   // Roster spots: taking on extra players means cutting someone (and some managers only do even trades)
   const extra = give.length - get.length;
-  const rosterCost = lean?.evenOnly ? 1.2 * Math.abs(extra) : 0.45 * Math.max(0, extra);
+  const rosterCost = lean?.evenOnly ? 1.2 * Math.abs(extra) : 0.15 * Math.max(0, extra);
   let taste = 0;
   const early = lean?.posBiasByPhase?.early;
   if (early) {
@@ -278,7 +279,7 @@ function combos<T>(xs: T[], k: number, from = 0): T[][] {
 /** Biggest package either side may send (4-for-3, 3-for-4 and so on). */
 const MAX_SIDE = 4;
 /** A bigger trade must beat the smaller one it grew from by this much (score = your gain × chance of a yes). */
-const GROW_MARGIN = 1.12;
+const GROW_MARGIN = 1.15;
 
 /**
  * Grow promising trades into bigger ones: add one player on your side, theirs, or both, and keep a version only
@@ -362,8 +363,10 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
     // Bigger deals (3-for-2, 3-for-3, up to 4 a side) when adding players makes a trade clearly better
     seeds.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept);
     for (const t of growTrades(seeds, top(mine, 10), top(partner.roster, 10), evalT)) if (ok(t)) found.push(t);
-    // Lineup gain x chance of a yes, nudged by market value (getting more than you give is better)
-    const rank = (t: TradeEval) => t.myGain * t.accept * (1 + 0.12 * Math.max(-2, Math.min(2, t.marketEdge)));
+    // Lineup gain x chance of a yes, nudged by market value (getting more than you give is better).
+    // 1-for-1 up to 2-for-2 deals are the bread and butter; bigger ones must earn their spot.
+    const rank = (t: TradeEval) => t.myGain * t.accept * (1 + 0.12 * Math.max(-2, Math.min(2, t.marketEdge)))
+      * (Math.max(t.give.length, t.get.length) > 2 ? 0.9 : 1);
     found.sort((a, b) => rank(b) - rank(a));
     // Keep distinct ideas: don't repeat the same players going out or coming back
     const seenGive = new Set<string>();
@@ -384,14 +387,18 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
       if (++kept >= opts.perPartner) break;
     }
   }
-  // Across partners, avoid suggesting the exact same package more than twice
+  // Across partners, avoid suggesting the exact same package more than twice, and keep most ideas to
+  // 2-for-2 or smaller: at most 3 bigger deals (3+ players on a side) make the list
   const counts = new Map<string, number>();
+  let big = 0;
   return out
     .sort((a, b) => b.myGain * b.accept - a.myGain * a.accept)
     .filter((t) => {
       const k = t.give.map((p) => p.id).sort().join(",");
       counts.set(k, (counts.get(k) ?? 0) + 1);
-      return (counts.get(k) ?? 0) <= 2;
+      if ((counts.get(k) ?? 0) > 2) return false;
+      if (Math.max(t.give.length, t.get.length) > 2) { if (big >= 3) return false; big += 1; }
+      return true;
     })
     .slice(0, opts.total)
     .map((t) => withDepthReport(t, cfg));
