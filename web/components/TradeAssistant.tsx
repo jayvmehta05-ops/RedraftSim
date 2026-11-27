@@ -14,7 +14,7 @@ import { lockedSet, resolveRoster, toggleLock, unmatchedCount } from "@/lib/rost
 import { afterLoans } from "@/lib/loans";
 import { PosBadge, fmt } from "./ui";
 import RateTrade, { applyTradeRating, reportTradeRating } from "./RateTrade";
-import { type Rating, describeTuning } from "@/lib/tradeTuning";
+import { type Rating, boostMine, describeTuning } from "@/lib/tradeTuning";
 
 interface Props {
   board: RankedPlayer[];
@@ -224,15 +224,17 @@ export default function TradeAssistant({ board, cfg, league, myManager, leaguema
     setRated(r.vote === "up" ? "Thanks for the rating." : "Thanks. Suggestions below are updated for your rating.");
   };
 
-  // Rosters as they'll be once 1-week loans end: players you lent out count as yours, borrowed ones as theirs
+  // Rosters as they'll be once 1-week loans end (players you lent out count as yours, borrowed ones as theirs),
+  // with any players you said you're underselling valued higher on your side
   const teams = useMemo(() => {
     if (!league?.rosters) return [];
-    return afterLoans(league.rosters.map((r) => {
+    const raw = league.rosters.map((r) => {
       const players = resolveRoster(r, byId, byEspn);
       const roster: Valued[] = players.map((p) => ({ p, v: playerValue(p, horizon, weeksLeft) }));
       return { id: r.managerId, name: names.get(r.managerId) ?? `Team ${r.managerId}`, roster, unmatched: unmatchedCount(r, byId, byEspn) };
-    }), league.rules?.loans);
-  }, [league, byId, byEspn, names, horizon, weeksLeft]);
+    });
+    return boostMine(afterLoans(raw, league.rules?.loans), myManager, league.rules?.tradeTuning);
+  }, [league, byId, byEspn, names, horizon, weeksLeft, myManager]);
 
   const me = teams.find((t) => t.id === myManager) ?? null;
   const partners: Partner[] = teams.filter((t) => t.id !== myManager).map((t) => ({ id: t.id, name: t.name, roster: t.roster, lean: leans.get(t.id) }));

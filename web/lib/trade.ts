@@ -114,6 +114,8 @@ export interface TradeEval {
   depth: DepthChange[];
   /** plain-English warnings about what the trade leaves you short of */
   warnings: string[];
+  /** market value you gain (+) or give away (-), in rough "draft rounds"; below -1.5 you're selling cheap */
+  marketEdge: number;
   /** your roster before and after, for the side-by-side lineup view (references, not copies) */
   rosterBefore: Valued[];
   rosterAfter: Valued[];
@@ -160,12 +162,39 @@ export function depthReport(before: Valued[], after: Valued[], cfg: LeagueConfig
 
 const sigmoid = (x: number) => 1 / (1 + Math.exp(-x));
 
-/** How the other manager sees it: lineup gain, how the names look by ADP, and their positional tastes. */
-/** `penalty` = how much harder a sell this manager is, from your "they'd never accept" ratings. */
+/** Points per game a typical waiver-level starter scores, per position: production above this is what managers notice. */
+const PROD_BASE: Record<Pos, number> = { QB: 15, RB: 8, WR: 8, TE: 6 };
+
+/**
+ * How valuable a player looks to other managers right now (0..220): this season's draft position on ESPN blended
+ * with how he's actually scoring this season. ("He's RB2 in fantasy right now" counts, not just where he was drafted.)
+ * Next season's ADP is only a fallback for players ESPN didn't rank.
+ */
+export function marketValue(p: RankedPlayer): number {
+  const adp = Math.max(0, 220 - (p.espnAdp ?? p.cur.adp ?? 220));
+  if (!(p.g26 >= 3)) return adp;
+  const prod = Math.min(219, Math.max(0, (p.cur.ppg26 ?? 0) - PROD_BASE[p.pos]) * 12);
+  return 0.5 * adp + 0.5 * prod;
+}
+
+/** A package's market value, top-heavy: the best player counts fully, the second 60%, then 35%, then 20%
+ *  (two good players rarely equal one star). */
+export function packageValue(ps: RankedPlayer[]): number {
+  return ps.map(marketValue).sort((a, b) => b - a).reduce((s, v, i) => s + v * [1, 0.6, 0.35, 0.2][Math.min(i, 3)], 0);
+}
+
+/** How the other manager sees it: lineup gain, market value (with a star premium), roster spots and their tastes.
+ *  `penalty` = how much harder a sell this manager is, from your "they'd never accept" ratings. */
 function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlayer[], lean?: LeaguemateProfile, penalty = 0): number {
   // From their side they receive `give` and send `get`.
-  const adpScore = (ps: RankedPlayer[]) => ps.reduce((s, p) => s + Math.max(0, 220 - p.cur.adp), 0);
-  const perceived = (adpScore(give) - adpScore(get)) / 40;
+  const perceived = (packageValue(give) - packageValue(get)) / 40;
+  const nameW = lean?.nameValue ?? 1;
+  // Star premium: managers rarely give up the best player in a deal unless a comparable one comes back
+  const best = (ps: RankedPlayer[]) => ps.reduce((m, p) => Math.max(m, marketValue(p)), 0);
+  const star = Math.max(0, best(get) - best(give)) / 40 * (0.6 + 0.4 * nameW);
+  // Roster spots: taking on extra players means cutting someone (and some managers only do even trades)
+  const extra = give.length - get.length;
+  const rosterCost = lean?.evenOnly ? 1.2 * Math.abs(extra) : 0.45 * Math.max(0, extra);
   let taste = 0;
   const early = lean?.posBiasByPhase?.early;
   if (early) {
@@ -181,8 +210,8 @@ function acceptance(theirGainPct: number, give: RankedPlayer[], get: RankedPlaye
   // Someone who "needs to win" wants about +1% to their lineup per point before it feels like a yes
   const need = 0.008 * (lean?.tradeWin ?? 0);
   // Lineup impact dominates; name value (ADP) and positional taste nudge it
-  return sigmoid(-0.3 + 45 * (theirGainPct - need) + 0.25 * (lean?.nameValue ?? 1) * Math.max(-3, Math.min(3, perceived)) + 0.5 * taste
-    + pkg + 0.6 * (lean?.tradeOpenness ?? 0) - 0.6 * penalty);
+  return sigmoid(-0.3 + 45 * (theirGainPct - need) + 0.25 * nameW * Math.max(-3, Math.min(3, perceived)) + 0.5 * taste
+    + pkg + 0.6 * (lean?.tradeOpenness ?? 0) - 0.6 * penalty - star - rosterCost);
 }
 
 export function evaluateTrade(
@@ -223,8 +252,15 @@ export function evaluateTrade(
   if ((lean?.tradeWin ?? 0) >= 1 && theirGain <= 0) reasons.push(`${lean?.name ?? "They"} likes to win trades, so expect a counter`);
   if ((lean?.tradeOpenness ?? 0) >= 1) reasons.push(`${lean?.name ?? "They"} trades often`);
   if ((lean?.tradeOpenness ?? 0) <= -1) reasons.push(`${lean?.name ?? "They"} rarely trades, so expect a harder sell`);
+  // Market value from your side: are you selling below what your players would fetch?
+  const marketEdge = (packageValue(get) - packageValue(give)) / 40;
+  const topGive = [...give].sort((a, b) => marketValue(b) - marketValue(a))[0];
+  if (marketEdge < -0.75 && topGive) reasons.push(`You'd give up more trade value than you get; ${topGive.name} could likely fetch more`);
+  const starOut = get.reduce((m, p) => Math.max(m, marketValue(p)), 0) - give.reduce((m, p) => Math.max(m, marketValue(p)), 0);
+  if (starOut > 25) reasons.push(`They'd give up the best player in the deal, so expect pushback`);
+  if (give.length > get.length) reasons.push(`They'd have to drop ${give.length - get.length} to make room`);
   const { depth, warnings } = withDepth ? depthReport(mine, myNew, cfg) : { depth: [], warnings: [] };
-  return { partnerId, give, get, myBefore, myAfter, theirBefore, theirAfter, myGain, theirGain, accept, reasons, depth, warnings, rosterBefore: mine, rosterAfter: myNew };
+  return { partnerId, give, get, myBefore, myAfter, theirBefore, theirAfter, myGain, theirGain, accept, reasons, depth, warnings, rosterBefore: mine, rosterAfter: myNew, marketEdge };
 }
 
 /** Fill in the roster-depth report for a trade scored without it. */
@@ -309,8 +345,9 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
     const found: TradeEval[] = [];
     const seeds: TradeEval[] = [];
     const ok = (t: TradeEval) =>
-      // Must clearly help you, must not meaningfully hurt them, and must be plausible
-      t.myGain / Math.max(myBefore, 1) >= minGain && t.theirGain / Math.max(theirBefore, 1) >= -0.005 && t.accept >= minAccept;
+      // Must clearly help you, must not meaningfully hurt them, must be plausible, and mustn't sell your players cheap
+      t.myGain / Math.max(myBefore, 1) >= minGain && t.theirGain / Math.max(theirBefore, 1) >= -0.005 && t.accept >= minAccept
+      && t.marketEdge >= -1.5;
     const evalT = (give: RankedPlayer[], get: RankedPlayer[]) =>
       evaluateTrade(mine, partner.roster, give, get, cfg, partner.id, partner.lean, before, false, tuning);
     for (const [gk, rk] of [[1, 1], [2, 1], [1, 2], [2, 2]] as const) {
@@ -325,7 +362,9 @@ export function findTrades(mine: Valued[], partners: Partner[], cfg: LeagueConfi
     // Bigger deals (3-for-2, 3-for-3, up to 4 a side) when adding players makes a trade clearly better
     seeds.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept);
     for (const t of growTrades(seeds, top(mine, 10), top(partner.roster, 10), evalT)) if (ok(t)) found.push(t);
-    found.sort((a, b) => b.myGain * b.accept - a.myGain * a.accept);
+    // Lineup gain x chance of a yes, nudged by market value (getting more than you give is better)
+    const rank = (t: TradeEval) => t.myGain * t.accept * (1 + 0.12 * Math.max(-2, Math.min(2, t.marketEdge)));
+    found.sort((a, b) => rank(b) - rank(a));
     // Keep distinct ideas: don't repeat the same players going out or coming back
     const seenGive = new Set<string>();
     const seenGet = new Set<string>();

@@ -141,7 +141,7 @@ function ManagerCard({ name, learned, override, onOverride, onReset, roster, onR
               <div className="rounded-lg bg-slate-950/50 p-3 ring-1 ring-slate-800">
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-slate-400">How they trade</div>
                 <textarea value={tradeDesc} onChange={(e) => setTradeDesc(e.target.value)} rows={2}
-                  placeholder="e.g. trades a lot but always wants to win, needs a RB, loves big names, likes 2-for-1s"
+                  placeholder="e.g. trades a lot but always wants to win, needs a RB, loves big names, only does 2 for 2s"
                   className="w-full rounded-md bg-slate-800 px-3 py-2 text-sm text-white ring-1 ring-slate-700 placeholder:text-slate-500" />
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   <button onClick={() => { const r = applyTradeDescription(o, tradeDesc); onOverride({ ...r.override, preset: o.preset === "learned" ? "learned" : r.override.preset }); setTradeUnderstood(r.understood); }}
@@ -154,6 +154,10 @@ function ManagerCard({ name, learned, override, onOverride, onReset, roster, onR
                   <Slider label="Big names vs points" value={o.nameValue ?? 1} min={0} max={2} step={0.1} onChange={(v) => set({ nameValue: v })} left="points only" right="sold on names" />
                   <Slider label="2-for-1s" value={o.packages ?? 0} min={-1} max={1} step={0.5} onChange={(v) => set({ packages: v })} left="wants depth" right="likes consolidating" />
                 </div>
+                <label className="mt-3 flex items-center gap-2 text-xs text-slate-300">
+                  <input type="checkbox" checked={!!o.evenOnly} onChange={(e) => set({ evenOnly: e.target.checked })} className="accent-emerald-500" />
+                  Only does even trades (1-for-1, 2-for-2), so nobody has to drop a player
+                </label>
                 <div className="mt-3">
                   <div className="mb-1 text-[11px] text-slate-400">Looking for (tap to cycle: wants → selling → neither)</div>
                   <div className="flex flex-wrap gap-1.5">

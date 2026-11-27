@@ -21,6 +21,7 @@ export interface ProfileOverride {
   nameValue?: number;      // 0 (lineup points only) .. 2 (big names sell); 1 = typical
   tradeWants?: Partial<Record<Pos, number>>; // + looking for that position, - trying to move it
   packages?: number;       // -1 wants depth back .. +1 likes 2-for-1 consolidation
+  evenOnly?: boolean;      // only even trades (1-for-1, 2-for-2), so nobody has to drop anyone
   tradeNote?: string;      // the user's own description of how they trade
 }
 
@@ -105,6 +106,7 @@ const TRADE_RULES: { re: RegExp; label: string; apply: (o: ProfileOverride) => v
   { re: /only cares about (the )?(lineup|points|stats|numbers)|analytics|spreadsheet|by the numbers|sharp/, label: "only cares about lineup points", apply: (o) => { o.nameValue = 0.3; } },
   { re: /2[\s-]?for[\s-]?1|two[\s-]for[\s-]one|consolidat|package|quality over quantity/, label: "likes consolidating (2-for-1s)", apply: (o) => { o.packages = 1; } },
   { re: /\bdepth\b|quantity|more players|bodies/, label: "wants depth back", apply: (o) => { o.packages = -1; } },
+  { re: /even trades?|1[\s-]?for[\s-]?1|one[\s-]for[\s-]one|2[\s-]?for[\s-]?2|two[\s-]for[\s-]two|(doesn'?t|don'?t|won'?t|hates?) (want to |like to )?drop|no drops/, label: "only even trades (no drops)", apply: (o) => { o.evenOnly = true; } },
   ...(["QB", "RB", "WR", "TE"] as Pos[]).flatMap((pos) => {
     const w = POS_WORDS[pos];
     return [
@@ -136,6 +138,7 @@ export function tradeSummary(o: ProfileOverride): string[] {
   if (wants.length) out.push(`wants ${wants.join("/")}`);
   if ((o.packages ?? 0) > 0) out.push("likes 2-for-1s");
   if ((o.packages ?? 0) < 0) out.push("wants depth");
+  if (o.evenOnly) out.push("even trades only");
   return out;
 }
 
@@ -171,7 +174,7 @@ export function effectiveProfile(managerId: string, name: string, learned: Leagu
   return {
     ...base, name, posBias: {}, posBiasByPhase: { early, mid, late }, noise: o.noise, rookieBias: o.rookieBias,
     runSensitivity: o.runSensitivity, tradeOpenness: o.tradeOpenness,
-    tradeWin: o.tradeWin, nameValue: o.nameValue, tradeWants: o.tradeWants, packages: o.packages,
+    tradeWin: o.tradeWin, nameValue: o.nameValue, tradeWants: o.tradeWants, packages: o.packages, evenOnly: o.evenOnly,
     style: `${presetLabel ?? (o.preset === "learned" ? "learned, edited" : "custom")} · set by you`,
   };
 }

@@ -60,7 +60,7 @@ export default function RateTrade({ t, onRate }: { t: TradeEval; onRate: (r: Rat
           <div className="mb-1.5 text-[11px] text-slate-400">What&apos;s wrong with it? Your answer tunes the ideas you see.</div>
           <div className="flex flex-wrap gap-1.5">
             {REASONS.map((x) => (
-              <button key={x.id} className={chip} onClick={() => { setReason(x.id); setStep(x.id === "keep" ? "keep" : "note"); }}>{x.label}</button>
+              <button key={x.id} className={chip} onClick={() => { setReason(x.id); setStep(x.id === "keep" || x.id === "undersell" ? "keep" : "note"); }}>{x.label}</button>
             ))}
             <button className={chip} onClick={() => { setReason(undefined); setStep("note"); }}>Something else</button>
           </div>
@@ -68,10 +68,10 @@ export default function RateTrade({ t, onRate }: { t: TradeEval; onRate: (r: Rat
       )}
       {step === "keep" && (
         <div className="ff-fade">
-          <div className="mb-1.5 text-[11px] text-slate-400">Who are you keeping?</div>
+          <div className="mb-1.5 text-[11px] text-slate-400">{reason === "undersell" ? "Who's worth more than this?" : "Who are you keeping?"}</div>
           <div className="flex flex-wrap gap-1.5">
             {t.give.map((p) => (
-              <button key={p.id} className={chip} onClick={() => { setKeepId(p.id); setStep("note"); }}>Keep {p.name}</button>
+              <button key={p.id} className={chip} onClick={() => { setKeepId(p.id); setStep("note"); }}>{reason === "undersell" ? p.name : `Keep ${p.name}`}</button>
             ))}
           </div>
         </div>

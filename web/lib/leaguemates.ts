@@ -28,6 +28,8 @@ export interface LeaguemateProfile extends BotProfile {
   tradeWants?: Partial<Record<"QB" | "RB" | "WR" | "TE", number>>;
   /** -1 (wants depth: more players back) .. +1 (likes consolidating into fewer, better players) */
   packages?: number;
+  /** only does even trades (1-for-1, 2-for-2) so nobody has to drop a player */
+  evenOnly?: boolean;
 }
 
 export function buildLeaguemateBots(league: ImportedLeague): LeaguemateProfile[] {

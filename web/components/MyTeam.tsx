@@ -15,7 +15,7 @@ import { afterLoans } from "@/lib/loans";
 import { type LivePlayer, livePoints, useLiveWeek } from "@/lib/live";
 import { statusLabel } from "@/lib/weekly";
 import { applyTradeRating, reportTradeRating } from "./RateTrade";
-import type { Rating } from "@/lib/tradeTuning";
+import { type Rating, boostMine } from "@/lib/tradeTuning";
 import { type LeagueTeam, useLeagueTeams } from "./useLeagueTeams";
 import { HorizonToggle, horizonLabel as labelFor } from "./Waivers";
 import { Flags, PosBadge, fmt, thumb } from "./ui";
@@ -185,7 +185,8 @@ export default function MyTeam({ board, cfg, league, myManager, leaguemates, wee
   const { teams: weekTeams } = useLeagueTeams(board, league, "week", weeksLeft);
   // Rosters as they'll be once 1-week loans end (trade ideas); 1-week trades use this week's rosters
   const loans = league.rules?.loans;
-  const tradeTeams = useMemo(() => afterLoans(teams, loans), [teams, loans]);
+  const tuningForTrades = league.rules?.tradeTuning;
+  const tradeTeams = useMemo(() => boostMine(afterLoans(teams, loans), myManager, tuningForTrades), [teams, loans, myManager, tuningForTrades]);
   const leans = useMemo(() => new Map(leaguemates.map((l) => [l.managerId, l])), [leaguemates]);
   const locked = useMemo(() => lockedSet(league), [league]);
   // Rest-of-season rank at each position across the whole board

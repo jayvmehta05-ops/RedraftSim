@@ -241,6 +241,8 @@ export interface TradeTuning {
   minAccept?: number;
   /** managerId -> how much harder a sell they are than their profile says */
   partnerPenalty?: Record<string, number>;
+  /** board player id -> how much more you value him than the projections (x1.15 per rating, up to x1.6) */
+  playerBoost?: Record<string, number>;
   votes?: { up: number; down: number };
 }
 
